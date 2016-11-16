@@ -1,20 +1,3 @@
-/*
- * This file is protected by Copyright. Please refer to the COPYRIGHT file distributed with this
- * source distribution.
- *
- * This file is part of REDHAWK Basic Components TuneFilterDecimate.
- *
- * REDHAWK Basic Components TuneFilterDecimate is free software: you can redistribute it and/or modify it under the terms of
- * the GNU General Public License as published by the Free Software Foundation, either
- * version 3 of the License, or (at your option) any later version.
- *
- * REDHAWK Basic Components TuneFilterDecimate is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- * PURPOSE.  See the GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along with this
- * program.  If not, see http://www.gnu.org/licenses/.
- */
 #include "TuneFilterDecimate_base.h"
 
 /*******************************************************************************************
@@ -28,7 +11,7 @@
 ******************************************************************************************/
 
 TuneFilterDecimate_base::TuneFilterDecimate_base(const char *uuid, const char *label) :
-    Resource_impl(uuid, label),
+    Component(uuid, label),
     ThreadedComponent()
 {
     loadProperties();
@@ -53,13 +36,13 @@ TuneFilterDecimate_base::~TuneFilterDecimate_base()
 *******************************************************************************************/
 void TuneFilterDecimate_base::start() throw (CORBA::SystemException, CF::Resource::StartError)
 {
-    Resource_impl::start();
+    Component::start();
     ThreadedComponent::startThread();
 }
 
 void TuneFilterDecimate_base::stop() throw (CORBA::SystemException, CF::Resource::StopError)
 {
-    Resource_impl::stop();
+    Component::stop();
     if (!ThreadedComponent::stopThread()) {
         throw CF::Resource::StopError(CF::CF_NOTSET, "Processing thread did not die");
     }
@@ -74,7 +57,7 @@ void TuneFilterDecimate_base::releaseObject() throw (CORBA::SystemException, CF:
         // TODO - this should probably be logged instead of ignored
     }
 
-    Resource_impl::releaseObject();
+    Component::releaseObject();
 }
 
 void TuneFilterDecimate_base::loadProperties()

@@ -1,31 +1,14 @@
-/*
- * This file is protected by Copyright. Please refer to the COPYRIGHT file distributed with this
- * source distribution.
- *
- * This file is part of REDHAWK Basic Components TuneFilterDecimate.
- *
- * REDHAWK Basic Components TuneFilterDecimate is free software: you can redistribute it and/or modify it under the terms of
- * the GNU General Public License as published by the Free Software Foundation, either
- * version 3 of the License, or (at your option) any later version.
- *
- * REDHAWK Basic Components TuneFilterDecimate is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- * PURPOSE.  See the GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along with this
- * program.  If not, see http://www.gnu.org/licenses/.
- */
-#ifndef TUNEFILTERDECIMATE_IMPL_BASE_H
-#define TUNEFILTERDECIMATE_IMPL_BASE_H
+#ifndef TUNEFILTERDECIMATE_BASE_IMPL_BASE_H
+#define TUNEFILTERDECIMATE_BASE_IMPL_BASE_H
 
 #include <boost/thread.hpp>
-#include <ossie/Resource_impl.h>
+#include <ossie/Component.h>
 #include <ossie/ThreadedComponent.h>
 
 #include <bulkio/bulkio.h>
 #include "struct_props.h"
 
-class TuneFilterDecimate_base : public Resource_impl, protected ThreadedComponent
+class TuneFilterDecimate_base : public Component, protected ThreadedComponent
 {
     public:
         TuneFilterDecimate_base(const char *uuid, const char *label);
@@ -41,23 +24,37 @@ class TuneFilterDecimate_base : public Resource_impl, protected ThreadedComponen
 
     protected:
         // Member variables exposed as properties
+        /// Property: TuneMode
         std::string TuneMode;
+        /// Property: TuningNorm
         double TuningNorm;
+        /// Property: TuningIF
         double TuningIF;
+        /// Property: TuningRF
         CORBA::ULongLong TuningRF;
+        /// Property: FilterBW
         float FilterBW;
+        /// Property: DesiredOutputRate
         float DesiredOutputRate;
+        /// Property: ActualOutputRate
         double ActualOutputRate;
+        /// Property: InputRF
         double InputRF;
+        /// Property: InputRate
         double InputRate;
+        /// Property: DecimationFactor
         CORBA::ULong DecimationFactor;
+        /// Property: taps
         CORBA::ULong taps;
+        /// Property: filterProps
         filterProps_struct filterProps;
 
         // Ports
+        /// Port: dataFloat_in
         bulkio::InFloatPort *dataFloat_in;
+        /// Port: dataFloat_out
         bulkio::OutFloatPort *dataFloat_out;
 
     private:
 };
-#endif // TUNEFILTERDECIMATE_IMPL_BASE_H
+#endif // TUNEFILTERDECIMATE_BASE_IMPL_BASE_H
