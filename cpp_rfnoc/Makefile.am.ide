@@ -3,11 +3,16 @@
 # and choosing Resource Configurations -> Exclude from build. Re-include files
 # by opening the Properties dialog of your project and choosing C/C++ Build ->
 # Tool Chain Editor, and un-checking "Exclude resource from build "
-redhawk_SOURCES_auto = TuneFilterDecimate.cpp
+redhawk_SOURCES_auto = GenericThreadedComponent.cpp
+redhawk_SOURCES_auto += GenericThreadedComponent.h
+redhawk_SOURCES_auto += RFNoC_Component.h
+redhawk_SOURCES_auto += TuneFilterDecimate.cpp
 redhawk_SOURCES_auto += TuneFilterDecimate.h
 redhawk_SOURCES_auto += TuneFilterDecimate_base.cpp
 redhawk_SOURCES_auto += TuneFilterDecimate_base.h
 redhawk_SOURCES_auto += main.cpp
 redhawk_SOURCES_auto += struct_props.h
-redhawk_INCLUDES_auto = -I/var/RedHawk-2.0.2/sdr/dom/deps/rh/dsp/include
+redhawk_INCLUDES_auto = -I/var/RedHawk-2.0.2/sdr/dom/deps/liquid-dsp/include
+redhawk_INCLUDES_auto += -I/var/RedHawk-2.0.2/sdr/dom/deps/rh/dsp/include
 redhawk_INCLUDES_auto += -I/var/RedHawk-2.0.2/sdr/dom/deps/rh/fftlib/include
+redhawk_INCLUDES_auto += -I/home/Patrick/git/uhd/host/include

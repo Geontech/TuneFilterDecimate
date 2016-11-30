@@ -12,14 +12,18 @@
 PREPARE_LOGGING(TuneFilterDecimate_i)
 
 TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) :
-    TuneFilterDecimate_base(uuid, label)
+    TuneFilterDecimate_base(uuid, label),
+    receivedSRI(false),
+    rxThread(NULL),
+    spp(512),
+    txThread(NULL)
 {
-    // Avoid placing constructor code here. Instead, use the "constructor" function.
-
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 }
 
 TuneFilterDecimate_i::~TuneFilterDecimate_i()
 {
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 }
 
 void TuneFilterDecimate_i::constructor()
@@ -27,223 +31,195 @@ void TuneFilterDecimate_i::constructor()
     /***********************************************************************************
      This is the RH constructor. All properties are properly initialized before this function is called 
     ***********************************************************************************/
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 }
 
-/***********************************************************************************************
-
-    Basic functionality:
-
-        The service function is called by the serviceThread object (of type ProcessThread).
-        This call happens immediately after the previous call if the return value for
-        the previous call was NORMAL.
-        If the return value for the previous call was NOOP, then the serviceThread waits
-        an amount of time defined in the serviceThread's constructor.
-        
-    SRI:
-        To create a StreamSRI object, use the following code:
-                std::string stream_id = "testStream";
-                BULKIO::StreamSRI sri = bulkio::sri::create(stream_id);
-
-    Time:
-        To create a PrecisionUTCTime object, use the following code:
-                BULKIO::PrecisionUTCTime tstamp = bulkio::time::utils::now();
-
-        
-    Ports:
-
-        Data is passed to the serviceFunction through by reading from input streams
-        (BulkIO only). The input stream class is a port-specific class, so each port
-        implementing the BulkIO interface will have its own type-specific input stream.
-        UDP multicast (dataSDDS and dataVITA49) and string-based (dataString, dataXML and
-        dataFile) do not support streams.
-
-        The input stream from which to read can be requested with the getCurrentStream()
-        method. The optional argument to getCurrentStream() is a floating point number that
-        specifies the time to wait in seconds. A zero value is non-blocking. A negative value
-        is blocking.  Constants have been defined for these values, bulkio::Const::BLOCKING and
-        bulkio::Const::NON_BLOCKING.
-
-        More advanced uses of input streams are possible; refer to the REDHAWK documentation
-        for more details.
-
-        Input streams return data blocks that automatically manage the memory for the data
-        and include the SRI that was in effect at the time the data was received. It is not
-        necessary to delete the block; it will be cleaned up when it goes out of scope.
-
-        To send data using a BulkIO interface, create an output stream and write the
-        data to it. When done with the output stream, the close() method sends and end-of-
-        stream flag and cleans up.
-
-        NOTE: If you have a BULKIO dataSDDS or dataVITA49  port, you must manually call 
-              "port->updateStats()" to update the port statistics when appropriate.
-
-        Example:
-            // This example assumes that the component has two ports:
-            //  An input (provides) port of type bulkio::InShortPort called dataShort_in
-            //  An output (uses) port of type bulkio::OutFloatPort called dataFloat_out
-            // The mapping between the port and the class is found
-            // in the component base class header file
-            // The component class must have an output stream member; add to
-            // TuneFilterDecimate.h:
-            //   bulkio::OutFloatStream outputStream;
-
-            bulkio::InShortStream inputStream = dataShort_in->getCurrentStream();
-            if (!inputStream) { // No streams are available
-                return NOOP;
-            }
-
-            bulkio::ShortDataBlock block = inputStream.read();
-            if (!block) { // No data available
-                // Propagate end-of-stream
-                if (inputStream.eos()) {
-                   outputStream.close();
-                }
-                return NOOP;
-            }
-
-            short* inputData = block.data();
-            std::vector<float> outputData;
-            outputData.resize(block.size());
-            for (size_t index = 0; index < block.size(); ++index) {
-                outputData[index] = (float) inputData[index];
-            }
-
-            // If there is no output stream open, create one
-            if (!outputStream) {
-                outputStream = dataFloat_out->createStream(block.sri());
-            } else if (block.sriChanged()) {
-                // Update output SRI
-                outputStream.sri(block.sri());
-            }
-
-            // Write to the output stream
-            outputStream.write(outputData, block.getTimestamps());
-
-            // Propagate end-of-stream
-            if (inputStream.eos()) {
-              outputStream.close();
-            }
-
-            return NORMAL;
-
-        If working with complex data (i.e., the "mode" on the SRI is set to
-        true), the data block's complex() method will return true. Data blocks
-        provide functions that return the correct interpretation of the data
-        buffer and number of complex elements:
-
-            if (block.complex()) {
-                std::complex<short>* data = block.cxdata();
-                for (size_t index = 0; index < block.cxsize(); ++index) {
-                    data[index] = std::abs(data[index]);
-                }
-                outputStream.write(data, block.cxsize(), bulkio::time::utils::now());
-            }
-
-        Interactions with non-BULKIO ports are left up to the component developer's discretion
-        
-    Messages:
-    
-        To receive a message, you need (1) an input port of type MessageEvent, (2) a message prototype described
-        as a structure property of kind message, (3) a callback to service the message, and (4) to register the callback
-        with the input port.
-        
-        Assuming a property of type message is declared called "my_msg", an input port called "msg_input" is declared of
-        type MessageEvent, create the following code:
-        
-        void TuneFilterDecimate_i::my_message_callback(const std::string& id, const my_msg_struct &msg){
-        }
-        
-        Register the message callback onto the input port with the following form:
-        this->msg_input->registerMessage("my_msg", this, &TuneFilterDecimate_i::my_message_callback);
-        
-        To send a message, you need to (1) create a message structure, (2) a message prototype described
-        as a structure property of kind message, and (3) send the message over the port.
-        
-        Assuming a property of type message is declared called "my_msg", an output port called "msg_output" is declared of
-        type MessageEvent, create the following code:
-        
-        ::my_msg_struct msg_out;
-        this->msg_output->sendMessage(msg_out);
-
-    Accessing the Application and Domain Manager:
-    
-        Both the Application hosting this Component and the Domain Manager hosting
-        the Application are available to the Component.
-        
-        To access the Domain Manager:
-            CF::DomainManager_ptr dommgr = this->getDomainManager()->getRef();
-        To access the Application:
-            CF::Application_ptr app = this->getApplication()->getRef();
-    
-    Properties:
-        
-        Properties are accessed directly as member variables. For example, if the
-        property name is "baudRate", it may be accessed within member functions as
-        "baudRate". Unnamed properties are given the property id as its name.
-        Property types are mapped to the nearest C++ type, (e.g. "string" becomes
-        "std::string"). All generated properties are declared in the base class
-        (TuneFilterDecimate_base).
-    
-        Simple sequence properties are mapped to "std::vector" of the simple type.
-        Struct properties, if used, are mapped to C++ structs defined in the
-        generated file "struct_props.h". Field names are taken from the name in
-        the properties file; if no name is given, a generated name of the form
-        "field_n" is used, where "n" is the ordinal number of the field.
-        
-        Example:
-            // This example makes use of the following Properties:
-            //  - A float value called scaleValue
-            //  - A boolean called scaleInput
-              
-            if (scaleInput) {
-                dataOut[i] = dataIn[i] * scaleValue;
-            } else {
-                dataOut[i] = dataIn[i];
-            }
-            
-        Callback methods can be associated with a property so that the methods are
-        called each time the property value changes.  This is done by calling 
-        addPropertyListener(<property>, this, &TuneFilterDecimate_i::<callback method>)
-        in the constructor.
-
-        The callback method receives two arguments, the old and new values, and
-        should return nothing (void). The arguments can be passed by value,
-        receiving a copy (preferred for primitive types), or by const reference
-        (preferred for strings, structs and vectors).
-
-        Example:
-            // This example makes use of the following Properties:
-            //  - A float value called scaleValue
-            //  - A struct property called status
-            
-        //Add to TuneFilterDecimate.cpp
-        TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) :
-            TuneFilterDecimate_base(uuid, label)
-        {
-            addPropertyListener(scaleValue, this, &TuneFilterDecimate_i::scaleChanged);
-            addPropertyListener(status, this, &TuneFilterDecimate_i::statusChanged);
-        }
-
-        void TuneFilterDecimate_i::scaleChanged(float oldValue, float newValue)
-        {
-            LOG_DEBUG(TuneFilterDecimate_i, "scaleValue changed from" << oldValue << " to " << newValue);
-        }
-            
-        void TuneFilterDecimate_i::statusChanged(const status_struct& oldValue, const status_struct& newValue)
-        {
-            LOG_DEBUG(TuneFilterDecimate_i, "status changed");
-        }
-            
-        //Add to TuneFilterDecimate.h
-        void scaleChanged(float oldValue, float newValue);
-        void statusChanged(const status_struct& oldValue, const status_struct& newValue);
-        
-
-************************************************************************************************/
-int TuneFilterDecimate_i::serviceFunction()
+// Service functions for RX and TX
+int TuneFilterDecimate_i::rxServiceFunction()
 {
-    LOG_DEBUG(TuneFilterDecimate_i, "serviceFunction() example log message");
-    
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
     return NOOP;
+}
+
+int TuneFilterDecimate_i::txServiceFunction()
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    return NOOP;
+}
+
+// Override start and stop
+void TuneFilterDecimate_i::start() throw (CF::Resource::StartError, CORBA::SystemException)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+}
+
+void TuneFilterDecimate_i::stop() throw (CF::Resource::StopError, CORBA::SystemException)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+}
+
+/*
+ * A method which allows a callback to be set for the block ID changing. This
+ * callback should point back to the persona to alert it of the component's
+ * block IDs
+ */
+void TuneFilterDecimate_i::setBlockIDCallback(blockIDCallback cb)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    this->blockIDChange = cb;
+}
+
+/*
+ * A method which allows the persona to set this component as an RX streamer.
+ * This means the component should retrieve the data from block and then send
+ * it out as bulkio data.
+ */
+void TuneFilterDecimate_i::setRxStreamer(bool enable)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    if (enable) {
+        // Don't create an RX stream if it already exists
+        if (this->rxStream.get()) {
+            LOG_DEBUG(TuneFilterDecimate_i, "Attempted to set RX streamer, but already streaming");
+            return;
+        }
+
+        LOG_DEBUG(TuneFilterDecimate_i, "Attempting to set RX streamer");
+
+        // Get the RX stream
+        retrieveRxStream();
+
+        // Create the receive buffer
+        this->output.resize(10*spp);
+
+        // Start continuous streaming immediately
+        uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+        stream_cmd.num_samps = 0;
+        stream_cmd.stream_now = true;
+        stream_cmd.time_spec = uhd::time_spec_t();
+
+        this->rxStream->issue_stream_cmd(stream_cmd);
+
+        // Create the RX receive thread
+        this->rxThread = new GenericThreadedComponent(boost::bind(&TuneFilterDecimate_i::rxServiceFunction, this));
+
+        // If the component is already started, then start the RX receive thread
+        if (this->_started) {
+            this->rxThread->start();
+        }
+    } else {
+        // Don't clean up the stream if it's not already running
+        if (not this->rxStream.get()) {
+            LOG_DEBUG(TuneFilterDecimate_i, "Attempted to unset RX streamer, but not streaming");
+            return;
+        }
+
+        // Stop continuous streaming
+        uhd::stream_cmd_t streamCmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+
+        this->rxStream->issue_stream_cmd(streamCmd);
+
+        // Stop and delete the RX stream thread
+        if (not this->rxThread->stop()) {
+            LOG_WARN(TuneFilterDecimate_i, "RX Thread had to be killed");
+        }
+
+        // Release the RX stream pointer
+        this->rxStream.reset();
+
+        delete this->rxThread;
+        this->rxThread = NULL;
+    }
+}
+
+/*
+ * A method which allows the persona to set this component as a TX streamer.
+ * This means the component should retrieve the data from the bulkio port and
+ *  then send it to the block.
+ */
+void TuneFilterDecimate_i::setTxStreamer(bool enable)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    if (enable) {
+        // Don't create a TX stream if it already exists
+        if (this->txStream.get()) {
+            LOG_DEBUG(TuneFilterDecimate_i, "Attempted to set TX streamer, but already streaming");
+            return;
+        }
+
+        LOG_DEBUG(TuneFilterDecimate_i, "Attempting to set TX streamer");
+
+        // Get the TX stream
+        retrieveTxStream();        // Avoid placing constructor code here. Instead, use the "constructor" function.
+
+
+        // Create the TX transmit thread
+        this->txThread = new GenericThreadedComponent(boost::bind(&TuneFilterDecimate_i::txServiceFunction, this));
+
+        // If the component is already started, then start the TX transmit thread
+        if (this->_started) {
+            this->txThread->start();
+        }
+    } else {
+        // Don't clean up the stream if it's not already running
+        if (not this->txStream.get()) {
+            LOG_DEBUG(TuneFilterDecimate_i, "Attempted to unset TX streamer, but not streaming");
+            return;
+        }
+
+        // Stop and delete the TX stream thread
+        if (not this->txThread->stop()) {
+            LOG_WARN(TuneFilterDecimate_i, "TX Thread had to be killed");
+        }
+
+        // Release the TX stream pointer
+        this->txStream.reset();
+
+        delete this->txThread;
+        this->txThread = NULL;
+    }
+}
+
+/*
+ * A method which allows the persona to set the address of the USRP it is
+ * using.
+ */
+void TuneFilterDecimate_i::setUsrpAddress(uhd::device_addr_t usrpAddress)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    // Retrieve a pointer to the device
+    this->usrp = uhd::device3::make(usrpAddress);
+
+    // Save the address for later, if needed
+    this->usrpAddress = usrpAddress;
+
+    // Without a valid USRP, this component can't do anything
+    if (not usrp.get()) {
+        LOG_FATAL(TuneFilterDecimate_i, "Received a USRP which is not RF-NoC compatible.");
+        throw std::exception();
+    }
+}
+
+void TuneFilterDecimate_i::streamChanged(bulkio::InShortPort::StreamType stream)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+}
+
+void TuneFilterDecimate_i::retrieveRxStream()
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+}
+
+void TuneFilterDecimate_i::retrieveTxStream()
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 }
 

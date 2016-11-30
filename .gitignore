@@ -16,3 +16,11 @@ ltmain.sh
 missing
 *.o
 *.swp
+cpp_rfnoc/.libs/libTuneFilterDecimate.a
+cpp_rfnoc/.libs/libTuneFilterDecimate.la
+cpp_rfnoc/.libs/libTuneFilterDecimate.lai
+cpp_rfnoc/.libs/libTuneFilterDecimate.so
+cpp_rfnoc/.libs/libTuneFilterDecimate.so.0
+cpp_rfnoc/.libs/libTuneFilterDecimate.so.0.0.0
+cpp_rfnoc/libTuneFilterDecimate.la
+cpp_rfnoc/libTuneFilterDecimate_la-GenericThreadedComponent.lo

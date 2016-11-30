@@ -49,5 +49,10 @@
     <os name="Linux"/>
     <processor name="x86"/>
     <processor name="x86_64"/>
+    <dependency type="runtime_requirements">
+      <softpkgref>
+        <localfile name="/deps/liquid-dsp/liquid-dsp.spd.xml"/>
+      </softpkgref>
+    </dependency>
   </implementation>
 </softpkg>
