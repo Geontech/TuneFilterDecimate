@@ -30,7 +30,7 @@ distclean-local:
 include $(srcdir)/Makefile.am.ide
 lib_LTLIBRARIES = libTuneFilterDecimate.la
 libTuneFilterDecimate_la_SOURCES = $(redhawk_SOURCES_auto)
-libTuneFilterDecimate_la_CXXFLAGS = -Wall $(SOFTPKG_CFLAGS) $(PROJECTDEPS_CFLAGS) $(BOOST_CPPFLAGS) $(INTERFACEDEPS_CFLAGS) $(redhawk_INCLUDES_auto) -lliquid
+libTuneFilterDecimate_la_CXXFLAGS = -Wall $(SOFTPKG_CFLAGS) $(PROJECTDEPS_CFLAGS) $(BOOST_CPPFLAGS) $(INTERFACEDEPS_CFLAGS) $(redhawk_INCLUDES_auto) -lliquid -lfftw3f
 libTuneFilterDecimate_la_LDFLAGS = -Wall $(INTERFACEDEPS_LIBS) $(redhawk_LDFLAGS_auto)
 libdir = $(prefix)/dom/components/rh/TuneFilterDecimate/cpp_rfnoc/.libs
 
