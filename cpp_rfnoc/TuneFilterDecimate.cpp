@@ -14,9 +14,9 @@ PREPARE_LOGGING(TuneFilterDecimate_i)
 TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) :
     TuneFilterDecimate_base(uuid, label),
     receivedSRI(false),
-    rxThread(NULL),
-    spp(512),
-    txThread(NULL)
+    //rxThread(NULL),
+    spp(512)//,
+    //txThread(NULL)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 }
@@ -85,7 +85,7 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
 
     if (enable) {
         // Don't create an RX stream if it already exists
-        if (this->rxStream.get()) {
+        /*if (this->rxStream.get()) {
             LOG_DEBUG(TuneFilterDecimate_i, "Attempted to set RX streamer, but already streaming");
             return;
         }
@@ -112,10 +112,10 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
         // If the component is already started, then start the RX receive thread
         if (this->_started) {
             this->rxThread->start();
-        }
+        }*/
     } else {
         // Don't clean up the stream if it's not already running
-        if (not this->rxStream.get()) {
+        /*if (not this->rxStream.get()) {
             LOG_DEBUG(TuneFilterDecimate_i, "Attempted to unset RX streamer, but not streaming");
             return;
         }
@@ -134,7 +134,7 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
         this->rxStream.reset();
 
         delete this->rxThread;
-        this->rxThread = NULL;
+        this->rxThread = NULL;*/
     }
 }
 
@@ -149,7 +149,7 @@ void TuneFilterDecimate_i::setTxStreamer(bool enable)
 
     if (enable) {
         // Don't create a TX stream if it already exists
-        if (this->txStream.get()) {
+        /*if (this->txStream.get()) {
             LOG_DEBUG(TuneFilterDecimate_i, "Attempted to set TX streamer, but already streaming");
             return;
         }
@@ -166,10 +166,10 @@ void TuneFilterDecimate_i::setTxStreamer(bool enable)
         // If the component is already started, then start the TX transmit thread
         if (this->_started) {
             this->txThread->start();
-        }
+        }*/
     } else {
         // Don't clean up the stream if it's not already running
-        if (not this->txStream.get()) {
+        /*if (not this->txStream.get()) {
             LOG_DEBUG(TuneFilterDecimate_i, "Attempted to unset TX streamer, but not streaming");
             return;
         }
@@ -183,7 +183,7 @@ void TuneFilterDecimate_i::setTxStreamer(bool enable)
         this->txStream.reset();
 
         delete this->txThread;
-        this->txThread = NULL;
+        this->txThread = NULL;*/
     }
 }
 
@@ -196,7 +196,7 @@ void TuneFilterDecimate_i::setUsrpAddress(uhd::device_addr_t usrpAddress)
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Retrieve a pointer to the device
-    this->usrp = uhd::device3::make(usrpAddress);
+    /*this->usrp = uhd::device3::make(usrpAddress);
 
     // Save the address for later, if needed
     this->usrpAddress = usrpAddress;
@@ -205,7 +205,7 @@ void TuneFilterDecimate_i::setUsrpAddress(uhd::device_addr_t usrpAddress)
     if (not usrp.get()) {
         LOG_FATAL(TuneFilterDecimate_i, "Received a USRP which is not RF-NoC compatible.");
         throw std::exception();
-    }
+    }*/
 }
 
 void TuneFilterDecimate_i::streamChanged(bulkio::InShortPort::StreamType stream)
@@ -216,10 +216,72 @@ void TuneFilterDecimate_i::streamChanged(bulkio::InShortPort::StreamType stream)
 void TuneFilterDecimate_i::retrieveRxStream()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    // Release the old stream if necessary
+    /*if (this->rxStream.get()) {
+        LOG_DEBUG(TuneFilterDecimate_i, "Releasing old RX stream");
+        this->rxStream.reset();
+    }
+
+    // Set the stream arguments
+    // Only support short complex for now
+    uhd::stream_args_t stream_args("sc16", "sc16");
+    uhd::device_addr_t streamer_args;
+
+    streamer_args["block_id"] = this->blockID;
+
+    // Get the spp from the block
+    this->spp = this->rfnocBlock->get_args().cast<size_t>("spp", 1024);
+
+    streamer_args["spp"] = boost::lexical_cast<std::string>(this->spp);
+
+    stream_args.args = streamer_args;
+
+    LOG_DEBUG(TuneFilterDecimate_i, "Using streamer arguments: " << stream_args.args.to_string());
+
+    // Retrieve the RX stream as specified from the device 3
+    try {
+        this->rxStream = this->usrp->get_rx_stream(stream_args);
+    } catch(uhd::runtime_error &e) {
+        LOG_ERROR(TuneFilterDecimate_i, "Failed to retrieve RX stream: " << e.what());
+    } catch(...) {
+        LOG_ERROR(TuneFilterDecimate_i, "Unexpected error occurred while retrieving RX stream");
+    }*/
 }
 
 void TuneFilterDecimate_i::retrieveTxStream()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    // Release the old stream if necessary
+    /*if (this->txStream.get()) {
+        LOG_DEBUG(TuneFilterDecimate_i, "Releasing old TX stream");
+        this->txStream.reset();
+    }
+
+    // Set the stream arguments
+    // Only support short complex for now
+    uhd::stream_args_t stream_args("sc16", "sc16");
+    uhd::device_addr_t streamer_args;
+
+    streamer_args["block_id"] = this->blockID;
+
+    // Get the spp from the block
+    this->spp = this->rfnocBlock->get_args().cast<size_t>("spp", 1024);
+
+    streamer_args["spp"] = boost::lexical_cast<std::string>(this->spp);
+
+    stream_args.args = streamer_args;
+
+    LOG_DEBUG(TuneFilterDecimate_i, "Using streamer arguments: " << stream_args.args.to_string());
+
+    // Retrieve the TX stream as specified from the device 3
+    try {
+        this->txStream = this->usrp->get_tx_stream(stream_args);
+    } catch(uhd::runtime_error &e) {
+        LOG_ERROR(TuneFilterDecimate_i, "Failed to retrieve TX stream: " << e.what());
+    } catch(...) {
+        LOG_ERROR(TuneFilterDecimate_i, "Unexpected error occurred while retrieving TX stream");
+    }*/
 }
 

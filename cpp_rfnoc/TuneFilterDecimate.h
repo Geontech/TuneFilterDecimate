@@ -47,18 +47,18 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
 
     private:
         blockIDCallback blockIDChange;
-        uhd::rfnoc::fir_block_ctrl::sptr filter;
+        //uhd::rfnoc::block_ctrl_base::sptr decimator;
+        //uhd::rfnoc::fir_block_ctrl::sptr filter;
         std::vector<std::complex<short> > output;
         bool receivedSRI;
-        uhd::rfnoc::block_ctrl_base::sptr rfnocBlock;
-        uhd::rx_streamer::sptr rxStream;
-        GenericThreadedComponent *rxThread;
+        //uhd::rx_streamer::sptr rxStream;
+        //GenericThreadedComponent *rxThread;
         size_t spp;
         BULKIO::StreamSRI sri;
-        uhd::tx_streamer::sptr txStream;
-        GenericThreadedComponent *txThread;
-        uhd::device3::sptr usrp;
-        uhd::device_addr_t usrpAddress;
+        //uhd::tx_streamer::sptr txStream;
+        //GenericThreadedComponent *txThread;
+        //uhd::device3::sptr usrp;
+        //uhd::device_addr_t usrpAddress;
 };
 
 #endif // TUNEFILTERDECIMATE_I_IMPL_H
