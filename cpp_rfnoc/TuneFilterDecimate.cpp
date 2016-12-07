@@ -98,8 +98,8 @@ void TuneFilterDecimate_i::constructor()
     this->dataFloat_in->addStreamListener(this, &TuneFilterDecimate_i::streamChanged);
 
     // Preallocate the vectors
-    this->floatOutput.resize(10000);
-    this->output.resize(10000);
+    //this->floatOutput.resize(10000);
+    //this->output.resize(10000);
 }
 
 // Service functions for RX and TX
