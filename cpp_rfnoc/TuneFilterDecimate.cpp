@@ -13,10 +13,12 @@ PREPARE_LOGGING(TuneFilterDecimate_i)
 
 TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) :
     TuneFilterDecimate_base(uuid, label),
+    decimatorBlockId("0/KeepOneInN_0"),
+    filterBlockId("0/FIR_0"),
     receivedSRI(false),
-    //rxThread(NULL),
-    spp(512)//,
-    //txThread(NULL)
+    rxThread(NULL),
+    spp(512),
+    txThread(NULL)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 }
@@ -24,14 +26,78 @@ TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) 
 TuneFilterDecimate_i::~TuneFilterDecimate_i()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    // Stop streaming
+    if (this->rxStream.get()) {
+        uhd::stream_cmd_t streamCmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+
+        this->rxStream->issue_stream_cmd(streamCmd);
+    }
+
+    // Reset the RF-NoC blocks
+    if (this->decimator.get()) {
+        this->decimator->clear();
+    }
+
+    if (this->filter.get()) {
+        this->filter->clear();
+    }
+
+    // Release the threads if necessary
+    if (this->rxThread) {
+        delete this->rxThread;
+    }
+
+    if (this->txThread) {
+        delete this->txThread;
+    }
 }
 
 void TuneFilterDecimate_i::constructor()
 {
-    /***********************************************************************************
-     This is the RH constructor. All properties are properly initialized before this function is called 
-    ***********************************************************************************/
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    // Grab the pointers to the blocks
+    this->decimator = this->usrp->get_block_ctrl<uhd::rfnoc::block_ctrl_base>(this->decimatorBlockId);
+    this->filter = this->usrp->get_block_ctrl<uhd::rfnoc::fir_block_ctrl>(this->filterBlockId);
+
+    // Without either of these, there's no need to continue
+    if (not this->decimator) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->decimatorBlockId);
+        throw std::exception();
+    } else {
+        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->decimatorBlockId);
+    }
+
+    if (not this->filter) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->filterBlockId);
+        throw std::exception();
+    } else {
+        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->filterBlockId);
+    }
+
+    // Setup based on properties initially
+
+
+    // Register property change listeners
+
+
+    // Alert the persona of the block IDs
+    if (this->blockIDChange) {
+        std::vector<uhd::rfnoc::block_id_t> blocks;
+
+        blocks.push_back(this->decimatorBlockId);
+        blocks.push_back(this->filterBlockId);
+
+        this->blockIDChange(this->_identifier, blocks);
+    }
+
+    // Add an SRI change listener
+    this->dataFloat_in->addStreamListener(this, &TuneFilterDecimate_i::streamChanged);
+
+    // Preallocate the vectors
+    this->floatOutput.resize(10000);
+    this->output.resize(10000);
 }
 
 // Service functions for RX and TX
@@ -39,14 +105,118 @@ int TuneFilterDecimate_i::rxServiceFunction()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    return NOOP;
+    // Perform RX, if necessary
+    if (this->rxStream.get()) {
+        // Don't bother doing anything until the SRI has been received
+        if (not this->receivedSRI) {
+            LOG_DEBUG(TuneFilterDecimate_i, "RX Thread active but no SRI has been received");
+            return NOOP;
+        }
+
+        // Recv from the block
+        uhd::rx_metadata_t md;
+
+        LOG_DEBUG(TuneFilterDecimate_i, "Calling recv on the rx_stream");
+
+        size_t num_rx_samps = this->rxStream->recv(&this->output.front(), this->output.size(), md, 3.0);
+
+        // Check the meta data for error codes
+        if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+            LOG_ERROR(TuneFilterDecimate_i, "Timeout while streaming");
+            return NOOP;
+        } else if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
+            LOG_WARN(TuneFilterDecimate_i, "Overflow while streaming");
+        } else if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
+            LOG_WARN(TuneFilterDecimate_i, md.strerror());
+            return NOOP;
+        }
+
+        LOG_DEBUG(TuneFilterDecimate_i, "RX Thread Requested " << this->output.size() << " samples");
+        LOG_DEBUG(TuneFilterDecimate_i, "RX Thread Received " << num_rx_samps << " samples");
+
+        // Get the time stamps from the meta data
+        BULKIO::PrecisionUTCTime rxTime;
+
+        rxTime.twsec = md.time_spec.get_full_secs();
+        rxTime.tfsec = md.time_spec.get_frac_secs();
+
+        // Convert the short data to float data
+        //this->floatOutput.assign(this->output.begin(), this->output.end());
+        this->floatOutput.resize(this->output.size());
+
+        for (size_t i = 0; i < this->floatOutput.size(); ++i) {
+            this->floatOutput[i].real((float) this->output[i].real());
+            this->floatOutput[i].imag((float) this->output[i].imag());
+        }
+
+        // Write the data to the output stream
+        float *outputBuffer = (float *) this->floatOutput.data();
+
+        this->dataFloat_out->pushPacket(outputBuffer, this->floatOutput.size() * 2, rxTime, md.end_of_burst, this->sri.streamID._ptr);
+    }
+
+    return NORMAL;
 }
 
 int TuneFilterDecimate_i::txServiceFunction()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    return NOOP;
+    // Perform TX, if necessary
+    if (this->txStream.get()) {
+        // Wait on input data
+        bulkio::InFloatPort::DataTransferType *packet = this->dataFloat_in->getPacket(bulkio::Const::BLOCKING);
+
+        if (not packet) {
+            return NOOP;
+        }
+
+        // Convert the float data to short data
+        this->shortInput.assign(packet->dataBuffer.begin(), packet->dataBuffer.end());
+
+        uhd::tx_metadata_t md;
+        std::complex<short> *block = (std::complex<short> *) this->shortInput.data();
+        size_t blockSize = this->shortInput.size() / 2;
+
+        LOG_DEBUG(TuneFilterDecimate_i, "TX Thread Received " << blockSize << " samples");
+
+        if (blockSize == 0) {
+            LOG_DEBUG(TuneFilterDecimate_i, "Skipping empty packet");
+            delete packet;
+            return NOOP;
+        }
+
+        // Get the timestamp to send to the RF-NoC block
+        BULKIO::PrecisionUTCTime time = packet->T;
+
+        md.has_time_spec = true;
+        md.time_spec = uhd::time_spec_t(time.twsec, time.tfsec);
+
+        // Send the data
+        size_t num_tx_samps = this->txStream->send(block, blockSize, md);
+
+        if (blockSize != 0 and num_tx_samps == 0) {
+            LOG_DEBUG(TuneFilterDecimate_i, "The TX stream is no longer valid, obtaining a new one");
+
+            retrieveTxStream();
+        }
+
+        LOG_DEBUG(TuneFilterDecimate_i, "TX Thread Sent " << num_tx_samps << " samples");
+
+        // On EOS, forward to the RF-NoC Block
+        if (packet->EOS) {
+            LOG_DEBUG(TuneFilterDecimate_i, "EOS");
+
+            md.end_of_burst = true;
+
+            std::vector<std::complex<short> > empty;
+            this->txStream->send(&empty.front(), empty.size(), md);
+        }
+
+        delete packet;
+    }
+
+    return NORMAL;
 }
 
 // Override start and stop
@@ -54,12 +224,34 @@ void TuneFilterDecimate_i::start() throw (CF::Resource::StartError, CORBA::Syste
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
+    TuneFilterDecimate_base::start();
+
+    if (this->rxThread) {
+        this->rxThread->start();
+    }
+
+    if (this->txThread) {
+        this->txThread->start();
+    }
 }
 
 void TuneFilterDecimate_i::stop() throw (CF::Resource::StopError, CORBA::SystemException)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
+    if (this->rxThread) {
+        if (not this->rxThread->stop()) {
+            LOG_WARN(TuneFilterDecimate_i, "RX Thread had to be killed");
+        }
+    }
+
+    if (this->txThread) {
+        if (not this->txThread->stop()) {
+            LOG_WARN(TuneFilterDecimate_i, "TX Thread had to be killed");
+        }
+    }
+
+    TuneFilterDecimate_base::stop();
 }
 
 /*
@@ -85,7 +277,7 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
 
     if (enable) {
         // Don't create an RX stream if it already exists
-        /*if (this->rxStream.get()) {
+        if (this->rxStream.get()) {
             LOG_DEBUG(TuneFilterDecimate_i, "Attempted to set RX streamer, but already streaming");
             return;
         }
@@ -112,10 +304,10 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
         // If the component is already started, then start the RX receive thread
         if (this->_started) {
             this->rxThread->start();
-        }*/
+        }
     } else {
         // Don't clean up the stream if it's not already running
-        /*if (not this->rxStream.get()) {
+        if (not this->rxStream.get()) {
             LOG_DEBUG(TuneFilterDecimate_i, "Attempted to unset RX streamer, but not streaming");
             return;
         }
@@ -134,7 +326,7 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
         this->rxStream.reset();
 
         delete this->rxThread;
-        this->rxThread = NULL;*/
+        this->rxThread = NULL;
     }
 }
 
@@ -149,7 +341,7 @@ void TuneFilterDecimate_i::setTxStreamer(bool enable)
 
     if (enable) {
         // Don't create a TX stream if it already exists
-        /*if (this->txStream.get()) {
+        if (this->txStream.get()) {
             LOG_DEBUG(TuneFilterDecimate_i, "Attempted to set TX streamer, but already streaming");
             return;
         }
@@ -166,10 +358,10 @@ void TuneFilterDecimate_i::setTxStreamer(bool enable)
         // If the component is already started, then start the TX transmit thread
         if (this->_started) {
             this->txThread->start();
-        }*/
+        }
     } else {
         // Don't clean up the stream if it's not already running
-        /*if (not this->txStream.get()) {
+        if (not this->txStream.get()) {
             LOG_DEBUG(TuneFilterDecimate_i, "Attempted to unset TX streamer, but not streaming");
             return;
         }
@@ -183,7 +375,7 @@ void TuneFilterDecimate_i::setTxStreamer(bool enable)
         this->txStream.reset();
 
         delete this->txThread;
-        this->txThread = NULL;*/
+        this->txThread = NULL;
     }
 }
 
@@ -196,7 +388,7 @@ void TuneFilterDecimate_i::setUsrpAddress(uhd::device_addr_t usrpAddress)
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Retrieve a pointer to the device
-    /*this->usrp = uhd::device3::make(usrpAddress);
+    this->usrp = uhd::device3::make(usrpAddress);
 
     // Save the address for later, if needed
     this->usrpAddress = usrpAddress;
@@ -205,12 +397,21 @@ void TuneFilterDecimate_i::setUsrpAddress(uhd::device_addr_t usrpAddress)
     if (not usrp.get()) {
         LOG_FATAL(TuneFilterDecimate_i, "Received a USRP which is not RF-NoC compatible.");
         throw std::exception();
-    }*/
+    }
 }
 
-void TuneFilterDecimate_i::streamChanged(bulkio::InShortPort::StreamType stream)
+void TuneFilterDecimate_i::streamChanged(bulkio::InFloatPort::StreamType stream)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    this->sri = stream.sri();
+
+    // Default to complex
+    this->sri.mode = 1;
+
+    this->dataFloat_out->pushSRI(this->sri);
+
+    this->receivedSRI = true;
 }
 
 void TuneFilterDecimate_i::retrieveRxStream()
@@ -218,7 +419,7 @@ void TuneFilterDecimate_i::retrieveRxStream()
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Release the old stream if necessary
-    /*if (this->rxStream.get()) {
+    if (this->rxStream.get()) {
         LOG_DEBUG(TuneFilterDecimate_i, "Releasing old RX stream");
         this->rxStream.reset();
     }
@@ -228,10 +429,10 @@ void TuneFilterDecimate_i::retrieveRxStream()
     uhd::stream_args_t stream_args("sc16", "sc16");
     uhd::device_addr_t streamer_args;
 
-    streamer_args["block_id"] = this->blockID;
+    streamer_args["block_id"] = this->decimatorBlockId;
 
     // Get the spp from the block
-    this->spp = this->rfnocBlock->get_args().cast<size_t>("spp", 1024);
+    this->spp = this->decimator->get_args().cast<size_t>("spp", 1024);
 
     streamer_args["spp"] = boost::lexical_cast<std::string>(this->spp);
 
@@ -246,7 +447,7 @@ void TuneFilterDecimate_i::retrieveRxStream()
         LOG_ERROR(TuneFilterDecimate_i, "Failed to retrieve RX stream: " << e.what());
     } catch(...) {
         LOG_ERROR(TuneFilterDecimate_i, "Unexpected error occurred while retrieving RX stream");
-    }*/
+    }
 }
 
 void TuneFilterDecimate_i::retrieveTxStream()
@@ -254,7 +455,7 @@ void TuneFilterDecimate_i::retrieveTxStream()
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Release the old stream if necessary
-    /*if (this->txStream.get()) {
+    if (this->txStream.get()) {
         LOG_DEBUG(TuneFilterDecimate_i, "Releasing old TX stream");
         this->txStream.reset();
     }
@@ -264,10 +465,10 @@ void TuneFilterDecimate_i::retrieveTxStream()
     uhd::stream_args_t stream_args("sc16", "sc16");
     uhd::device_addr_t streamer_args;
 
-    streamer_args["block_id"] = this->blockID;
+    streamer_args["block_id"] = this->filterBlockId;
 
     // Get the spp from the block
-    this->spp = this->rfnocBlock->get_args().cast<size_t>("spp", 1024);
+    this->spp = this->filter->get_args().cast<size_t>("spp", 1024);
 
     streamer_args["spp"] = boost::lexical_cast<std::string>(this->spp);
 
@@ -282,6 +483,6 @@ void TuneFilterDecimate_i::retrieveTxStream()
         LOG_ERROR(TuneFilterDecimate_i, "Failed to retrieve TX stream: " << e.what());
     } catch(...) {
         LOG_ERROR(TuneFilterDecimate_i, "Unexpected error occurred while retrieving TX stream");
-    }*/
+    }
 }
 

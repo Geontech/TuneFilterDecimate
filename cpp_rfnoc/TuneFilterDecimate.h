@@ -39,7 +39,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
 
     private:
         // Stream listeners
-        void streamChanged(bulkio::InShortPort::StreamType stream);
+        void streamChanged(bulkio::InFloatPort::StreamType stream);
 
     private:
         void retrieveRxStream();
@@ -47,18 +47,22 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
 
     private:
         blockIDCallback blockIDChange;
-        //uhd::rfnoc::block_ctrl_base::sptr decimator;
-        //uhd::rfnoc::fir_block_ctrl::sptr filter;
+        uhd::rfnoc::block_ctrl_base::sptr decimator;
+        const uhd::rfnoc::block_id_t decimatorBlockId;
+        uhd::rfnoc::fir_block_ctrl::sptr filter;
+        const uhd::rfnoc::block_id_t filterBlockId;
+        std::vector<std::complex<float> > floatOutput;
         std::vector<std::complex<short> > output;
         bool receivedSRI;
-        //uhd::rx_streamer::sptr rxStream;
-        //GenericThreadedComponent *rxThread;
+        uhd::rx_streamer::sptr rxStream;
+        GenericThreadedComponent *rxThread;
+        std::vector<std::complex<short> > shortInput;
         size_t spp;
         BULKIO::StreamSRI sri;
-        //uhd::tx_streamer::sptr txStream;
-        //GenericThreadedComponent *txThread;
-        //uhd::device3::sptr usrp;
-        //uhd::device_addr_t usrpAddress;
+        uhd::tx_streamer::sptr txStream;
+        GenericThreadedComponent *txThread;
+        uhd::device3::sptr usrp;
+        uhd::device_addr_t usrpAddress;
 };
 
 #endif // TUNEFILTERDECIMATE_I_IMPL_H
