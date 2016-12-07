@@ -51,6 +51,8 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
     if (this->txThread) {
         delete this->txThread;
     }
+
+    LOG_INFO(TuneFilterDecimate_i, "END OF DESTRUCTOR");
 }
 
 void TuneFilterDecimate_i::constructor()
