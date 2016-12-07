@@ -107,6 +107,8 @@ int TuneFilterDecimate_i::rxServiceFunction()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
+    boost::mutex::scoped_lock lock(this->rxThreadLock);
+
     // Perform RX, if necessary
     if (this->rxStream.get()) {
         // Don't bother doing anything until the SRI has been received
@@ -163,6 +165,8 @@ int TuneFilterDecimate_i::rxServiceFunction()
 int TuneFilterDecimate_i::txServiceFunction()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    boost::mutex::scoped_lock lock(this->txThreadLock);
 
     // Perform TX, if necessary
     if (this->txStream.get()) {
@@ -242,12 +246,16 @@ void TuneFilterDecimate_i::stop() throw (CF::Resource::StopError, CORBA::SystemE
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     if (this->rxThread) {
+        boost::mutex::scoped_lock lock(this->rxThreadLock);
+
         if (not this->rxThread->stop()) {
             LOG_WARN(TuneFilterDecimate_i, "RX Thread had to be killed");
         }
     }
 
     if (this->txThread) {
+        boost::mutex::scoped_lock lock(this->txThreadLock);
+
         if (not this->txThread->stop()) {
             LOG_WARN(TuneFilterDecimate_i, "TX Thread had to be killed");
         }
@@ -319,6 +327,8 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
 
         this->rxStream->issue_stream_cmd(streamCmd);
 
+        boost::mutex::scoped_lock lock(this->rxThreadLock);
+
         // Stop and delete the RX stream thread
         if (not this->rxThread->stop()) {
             LOG_WARN(TuneFilterDecimate_i, "RX Thread had to be killed");
@@ -367,6 +377,8 @@ void TuneFilterDecimate_i::setTxStreamer(bool enable)
             LOG_DEBUG(TuneFilterDecimate_i, "Attempted to unset TX streamer, but not streaming");
             return;
         }
+
+        boost::mutex::scoped_lock lock(this->txThreadLock);
 
         // Stop and delete the TX stream thread
         if (not this->txThread->stop()) {

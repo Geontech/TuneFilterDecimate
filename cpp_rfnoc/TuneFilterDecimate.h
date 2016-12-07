@@ -56,11 +56,13 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         bool receivedSRI;
         uhd::rx_streamer::sptr rxStream;
         GenericThreadedComponent *rxThread;
+        boost::mutex rxThreadLock;
         std::vector<std::complex<short> > shortInput;
         size_t spp;
         BULKIO::StreamSRI sri;
         uhd::tx_streamer::sptr txStream;
         GenericThreadedComponent *txThread;
+        boost::mutex txThreadLock;
         uhd::device3::sptr usrp;
         uhd::device_addr_t usrpAddress;
 };
