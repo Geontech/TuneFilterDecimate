@@ -13,6 +13,11 @@ GenericThreadedComponent::GenericThreadedComponent(serviceFunction_t sf) :
     LOG_TRACE(GenericThreadedComponent, __PRETTY_FUNCTION__);
 }
 
+GenericThreadedComponent::~GenericThreadedComponent()
+{
+    stop();
+}
+
 /*
  * Call the service function callback
  */
