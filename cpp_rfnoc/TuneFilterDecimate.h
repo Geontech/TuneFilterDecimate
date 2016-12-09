@@ -31,6 +31,9 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         void start() throw (CF::Resource::StartError, CORBA::SystemException);
         void stop() throw (CF::Resource::StopError, CORBA::SystemException);
 
+        // Override releaseObject()
+        void releaseObject() throw (CF::LifeCycle::ReleaseError, CORBA::SystemException);
+
         // Methods to be called by the persona, inherited from RFNoC_ComponentInterface
         void setBlockIDCallback(blockIDCallback cb);
         void setRxStreamer(bool enable);
