@@ -264,7 +264,7 @@ void TuneFilterDecimate_i::stop() throw (CF::Resource::StopError, CORBA::SystemE
     TuneFilterDecimate_base::stop();
 }
 
-void TuneFilterDecimate_i::releseObject() throw (CF::LifeCycle::ReleaseError, CORBA::SystemException)
+void TuneFilterDecimate_i::releaseObject() throw (CF::LifeCycle::ReleaseError, CORBA::SystemException)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
