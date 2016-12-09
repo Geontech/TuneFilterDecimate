@@ -3,7 +3,7 @@
 
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
-#include <uhd/types/device_addr.hpp>
+#include <uhd/device3.hpp>
 #include <uhd/rfnoc/block_id.hpp>
 #include <string>
 #include <vector>
@@ -55,10 +55,9 @@ class RFNoC_ComponentInterface {
         virtual void setTxStreamer(bool enable) = 0;
 
         /*
-         * This method should keep a copy of the usrp address and/or use it to
-         * make a device3 shared pointer.
+         * This method should keep a copy of the device3 shared pointer.
          */
-        virtual void setUsrpAddress(uhd::device_addr_t usrpAddress) = 0;
+        virtual void setUsrp(uhd::device3::sptr usrp) = 0;
 
         /*
          * For safe inheritance.

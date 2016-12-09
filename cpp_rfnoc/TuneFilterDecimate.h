@@ -3,10 +3,10 @@
 
 #include "TuneFilterDecimate_base.h"
 
+#include <uhd/device3.hpp>
 #include <uhd/rfnoc/block_ctrl.hpp>
 #include <uhd/rfnoc/fir_block_ctrl.hpp>
 #include <uhd/rfnoc/graph.hpp>
-#include <uhd/device3.hpp>
 
 #include "GenericThreadedComponent.h"
 #include "RFNoC_Component.h"
@@ -35,7 +35,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         void setBlockIDCallback(blockIDCallback cb);
         void setRxStreamer(bool enable);
         void setTxStreamer(bool enable);
-        void setUsrpAddress(uhd::device_addr_t usrpAddress);
+        void setUsrp(uhd::device3::sptr usrp);
 
     private:
         // Stream listeners
@@ -64,7 +64,6 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         GenericThreadedComponent *txThread;
         boost::mutex txThreadLock;
         uhd::device3::sptr usrp;
-        uhd::device_addr_t usrpAddress;
 };
 
 #endif // TUNEFILTERDECIMATE_I_IMPL_H
