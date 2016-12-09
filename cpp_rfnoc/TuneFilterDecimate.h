@@ -16,7 +16,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
     ENABLE_LOGGING
     public:
         TuneFilterDecimate_i(const char *uuid, const char *label);
-        ~TuneFilterDecimate_i();
+        virtual ~TuneFilterDecimate_i();
 
         void constructor();
 
@@ -30,9 +30,6 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         // Override start and stop
         void start() throw (CF::Resource::StartError, CORBA::SystemException);
         void stop() throw (CF::Resource::StopError, CORBA::SystemException);
-
-        // Override releaseObject()
-        void releaseObject() throw (CF::LifeCycle::ReleaseError, CORBA::SystemException);
 
         // Methods to be called by the persona, inherited from RFNoC_ComponentInterface
         void setBlockIDCallback(blockIDCallback cb);

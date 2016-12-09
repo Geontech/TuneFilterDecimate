@@ -12,7 +12,7 @@ class TuneFilterDecimate_base : public Component, protected ThreadedComponent
 {
     public:
         TuneFilterDecimate_base(const char *uuid, const char *label);
-        ~TuneFilterDecimate_base();
+        virtual ~TuneFilterDecimate_base();
 
         void start() throw (CF::Resource::StartError, CORBA::SystemException);
 

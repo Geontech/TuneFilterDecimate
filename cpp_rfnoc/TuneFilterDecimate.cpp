@@ -264,13 +264,6 @@ void TuneFilterDecimate_i::stop() throw (CF::Resource::StopError, CORBA::SystemE
     TuneFilterDecimate_base::stop();
 }
 
-void TuneFilterDecimate_i::releaseObject() throw (CF::LifeCycle::ReleaseError, CORBA::SystemException)
-{
-    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
-
-    TuneFilterDecimate_base::releaseObject();
-}
-
 /*
  * A method which allows a callback to be set for the block ID changing. This
  * callback should point back to the persona to alert it of the component's
