@@ -47,6 +47,8 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
     private:
         void retrieveRxStream();
         void retrieveTxStream();
+        void startRxStream();
+        void stopRxStream();
 
     private:
         blockIDCallback blockIDChange;
@@ -58,6 +60,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         std::vector<std::complex<short> > output;
         bool receivedSRI;
         uhd::rx_streamer::sptr rxStream;
+        bool rxStreamStarted;
         GenericThreadedComponent *rxThread;
         boost::mutex rxThreadLock;
         std::vector<std::complex<short> > shortInput;

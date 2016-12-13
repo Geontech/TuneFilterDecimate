@@ -16,6 +16,7 @@ TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) 
     decimatorBlockId("0/KeepOneInN_0"),
     filterBlockId("0/FIR_0"),
     receivedSRI(false),
+    rxStreamStarted(false),
     rxThread(NULL),
     spp(512),
     txThread(NULL)
@@ -28,11 +29,7 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Stop streaming
-    if (this->rxStream.get()) {
-        uhd::stream_cmd_t streamCmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-
-        this->rxStream->issue_stream_cmd(streamCmd);
-    }
+    stopRxStream();
 
     // Reset the RF-NoC blocks
     if (this->decimator.get()) {
@@ -45,10 +42,12 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
 
     // Release the threads if necessary
     if (this->rxThread) {
+        this->rxThread->stop();
         delete this->rxThread;
     }
 
     if (this->txThread) {
+        this->txThread->stop();
         delete this->txThread;
     }
 
@@ -233,6 +232,8 @@ void TuneFilterDecimate_i::start() throw (CF::Resource::StartError, CORBA::Syste
     TuneFilterDecimate_base::start();
 
     if (this->rxThread) {
+        startRxStream();
+
         this->rxThread->start();
     }
 
@@ -251,6 +252,8 @@ void TuneFilterDecimate_i::stop() throw (CF::Resource::StopError, CORBA::SystemE
         if (not this->rxThread->stop()) {
             LOG_WARN(TuneFilterDecimate_i, "RX Thread had to be killed");
         }
+
+        stopRxStream();
     }
 
     if (this->txThread) {
@@ -267,6 +270,13 @@ void TuneFilterDecimate_i::stop() throw (CF::Resource::StopError, CORBA::SystemE
 void TuneFilterDecimate_i::releaseObject() throw (CF::LifeCycle::ReleaseError, CORBA::SystemException)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    // This function clears the component running condition so main shuts down everything
+    try {
+        stop();
+    } catch (CF::Resource::StopError& ex) {
+        // TODO - this should probably be logged instead of ignored
+    }
 
     releasePorts();
     stopPropertyChangeMonitor();
@@ -315,19 +325,13 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
         // Create the receive buffer
         this->output.resize(10*spp);
 
-        // Start continuous streaming immediately
-        uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
-        stream_cmd.num_samps = 0;
-        stream_cmd.stream_now = true;
-        stream_cmd.time_spec = uhd::time_spec_t();
-
-        this->rxStream->issue_stream_cmd(stream_cmd);
-
         // Create the RX receive thread
         this->rxThread = new GenericThreadedComponent(boost::bind(&TuneFilterDecimate_i::rxServiceFunction, this));
 
         // If the component is already started, then start the RX receive thread
         if (this->_started) {
+            startRxStream();
+
             this->rxThread->start();
         }
     } else {
@@ -337,17 +341,15 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
             return;
         }
 
-        // Stop continuous streaming
-        uhd::stream_cmd_t streamCmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-
-        this->rxStream->issue_stream_cmd(streamCmd);
-
         boost::mutex::scoped_lock lock(this->rxThreadLock);
 
         // Stop and delete the RX stream thread
         if (not this->rxThread->stop()) {
             LOG_WARN(TuneFilterDecimate_i, "RX Thread had to be killed");
         }
+
+        // Stop continuous streaming
+        stopRxStream();
 
         // Release the RX stream pointer
         this->rxStream.reset();
@@ -376,8 +378,7 @@ void TuneFilterDecimate_i::setTxStreamer(bool enable)
         LOG_DEBUG(TuneFilterDecimate_i, "Attempting to set TX streamer");
 
         // Get the TX stream
-        retrieveTxStream();        // Avoid placing constructor code here. Instead, use the "constructor" function.
-
+        retrieveTxStream();
 
         // Create the TX transmit thread
         this->txThread = new GenericThreadedComponent(boost::bind(&TuneFilterDecimate_i::txServiceFunction, this));
@@ -511,3 +512,33 @@ void TuneFilterDecimate_i::retrieveTxStream()
     }
 }
 
+void TuneFilterDecimate_i::startRxStream()
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    if (not this->rxStreamStarted) {
+        // Start continuous streaming
+        uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+        stream_cmd.num_samps = 0;
+        stream_cmd.stream_now = true;
+        stream_cmd.time_spec = uhd::time_spec_t();
+
+        this->rxStream->issue_stream_cmd(stream_cmd);
+
+        this->rxStreamStarted = true;
+    }
+}
+
+void TuneFilterDecimate_i::stopRxStream()
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    if (this->rxStreamStarted) {
+        // Start continuous streaming
+        uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+
+        this->rxStream->issue_stream_cmd(stream_cmd);
+
+        this->rxStreamStarted = false;
+    }
+}
