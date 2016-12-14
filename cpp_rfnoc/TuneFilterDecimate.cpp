@@ -593,12 +593,20 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
         return false;
     }
 
+    LOG_DEBUG(TuneFilterDecimate_i, "New Actual Output Rate: " << newActualOutputRate);
+
     // Convert these to the format required by liquid
     float convertedRipple = -20 * log10(this->filterProps.Ripple);
     float convertedTransitionWidth = this->filterProps.TransitionWidth / this->InputRate;
 
+    LOG_DEBUG(TuneFilterDecimate_i, "Ripple (dB): " << convertedRipple);
+    LOG_DEBUG(TuneFilterDecimate_i, "Transition Width (Normalized): " << convertedTransitionWidth);
+
     size_t availableFilterLength = this->filter->get_n_taps();
     size_t estimatedFilterLength = estimate_req_filter_len(convertedTransitionWidth, convertedRipple);
+
+    LOG_DEBUG(TuneFilterDecimate_i, "Available Filter Taps: " << availableFilterLength);
+    LOG_DEBUG(TuneFilterDecimate_i, "Estimated Filter Taps for design: " << estimatedFilterLength);
 
     if (availableFilterLength < estimatedFilterLength) {
         LOG_WARN(TuneFilterDecimate_i, "Unable to satisfy transition width and/or ripple requirements. Estimated filter length: " << estimatedFilterLength << ", Available filter length: " << availableFilterLength);
@@ -635,12 +643,21 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     }
 
     float cutoff = this->FilterBW / this->InputRate;
-    std::vector<float> kaiserTaps(estimatedFilterLength);
+
+    LOG_DEBUG(TuneFilterDecimate_i, "Normalized Cutoff: " << cutoff);
+
+    std::vector<float> kaiserTaps(availableFilterLength);
+
+    LOG_DEBUG(TuneFilterDecimate_i, "Calculating filter taps...");
 
     liquid_firdes_kaiser(availableFilterLength, cutoff, convertedRipple, 0, kaiserTaps.data());
 
+    LOG_DEBUG(TuneFilterDecimate_i, "Converting floating point taps to integer taps...");
+
     // Convert the taps to long
     std::vector<int> longKaiserTaps(kaiserTaps.begin(), kaiserTaps.end());
+
+    LOG_DEBUG(TuneFilterDecimate_i, "Setting filter taps on RF-NoC block...");
 
     // Send the taps to the filter RF-NoC block
     try {
@@ -652,6 +669,8 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
         LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting taps on filter RF-NoC block");
         return false;
     }
+
+    LOG_DEBUG(TuneFilterDecimate_i, "Setting decimation factor on RF-NoC block...");
 
     // Set the decimation factor on the keep-one-in-N RF-NoC block
     try {
