@@ -469,6 +469,8 @@ void TuneFilterDecimate_i::DesiredOutputRateChanged(const float &oldValue, const
         if (not configureFD()) {
             LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested DesiredOutputRate");
             this->DesiredOutputRate = oldValue;
+        } else {
+            this->dataFloat_out->pushSRI(this->sri);
         }
     } else {
         LOG_WARN(TuneFilterDecimate_i, "Not designing filter until receiving SRI");
