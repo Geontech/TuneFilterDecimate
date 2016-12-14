@@ -647,11 +647,11 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
 
     LOG_DEBUG(TuneFilterDecimate_i, "Normalized Cutoff: " << cutoff);
 
-    std::vector<float> kaiserTaps(availableFilterLength);
+    std::vector<float> kaiserTaps(estimatedFilterLength);
 
     LOG_DEBUG(TuneFilterDecimate_i, "Calculating filter taps...");
 
-    liquid_firdes_kaiser(availableFilterLength, cutoff, convertedRipple, 0, kaiserTaps.data());
+    liquid_firdes_kaiser(estimatedFilterLength, cutoff, convertedRipple, 0, kaiserTaps.data());
 
     LOG_DEBUG(TuneFilterDecimate_i, "Converting floating point taps to integer taps...");
 
@@ -683,6 +683,8 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
         LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting decimation factor on decimation RF-NoC block");
         return false;
     }
+
+    this->taps = longKaiserTaps.size();
 
     if (not sriChanged) {
         this->ActualOutputRate = this->InputRate / this->DecimationFactor;
