@@ -643,7 +643,7 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
         return false;
     }
 
-    float cutoff = this->FilterBW / (this->InputRate / 2);
+    float cutoff = this->FilterBW / (this->InputRate);
 
     LOG_DEBUG(TuneFilterDecimate_i, "Normalized Cutoff: " << cutoff);
 
