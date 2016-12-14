@@ -656,7 +656,11 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     LOG_DEBUG(TuneFilterDecimate_i, "Converting floating point taps to integer taps...");
 
     // Convert the taps to long
-    std::vector<int> longKaiserTaps(kaiserTaps.begin(), kaiserTaps.end());
+    std::vector<int> longKaiserTaps(estimatedFilterLength);
+
+    for (size_t i = 0; i < estimatedFilterLength; ++i) {
+        longKaiserTaps[i] = (pow(2, sizeof(int) * 8) - 1) * kaiserTaps[i];
+    }
 
     LOG_DEBUG(TuneFilterDecimate_i, "Setting filter taps on RF-NoC block...");
 
