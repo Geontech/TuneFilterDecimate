@@ -63,25 +63,42 @@ void TuneFilterDecimate_i::constructor()
     this->filter = this->usrp->get_block_ctrl<uhd::rfnoc::fir_block_ctrl>(this->filterBlockId);
 
     // Without either of these, there's no need to continue
-    if (not this->decimator) {
+    if (not this->decimator.get()) {
         LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->decimatorBlockId);
-        throw std::exception();
+        throw CF::LifeCycle::InitializeError();
     } else {
         LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->decimatorBlockId);
     }
 
-    if (not this->filter) {
+    if (not this->filter.get()) {
         LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->filterBlockId);
-        throw std::exception();
+        throw CF::LifeCycle::InitializeError();
     } else {
         LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->filterBlockId);
     }
+
+    // Create a graph
+    this->graph = this->usrp->create_graph("TuneFilterDecimate_" + this->_identifier);
+
+    // Without this, there's no need to continue
+    if (not this->graph.get()) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC graph");
+        throw CF::LifeCycle::InitializeError();
+    }
+
+    // Connect the blocks
+    this->graph->connect(this->filterBlockId, this->decimatorBlockId);
 
     // Setup based on properties initially
 
 
     // Register property change listeners
-
+    addPropertyListener(DesiredOutputRate, this, &TuneFilterDecimate_i::DesiredOutputRateChanged); //configureFilter
+    addPropertyListener(FilterBW, this, &TuneFilterDecimate_i::FilterBWChanged); //configureFilter
+    addPropertyListener(filterProps, this, &TuneFilterDecimate_i::filterPropsChanged); //configureFilter
+    addPropertyListener(TuningIF, this, &TuneFilterDecimate_i::TuningIFChanged); //configureTuner
+    addPropertyListener(TuningNorm, this, &TuneFilterDecimate_i::TuningNormChanged); //configureTuner
+    addPropertyListener(TuningRF, this, &TuneFilterDecimate_i::TuningRFChanged); //configureTuner
 
     // Alert the persona of the block IDs
     if (this->blockIDChange) {
@@ -426,18 +443,216 @@ void TuneFilterDecimate_i::setUsrp(uhd::device3::sptr usrp)
     }
 }
 
+void TuneFilterDecimate_i::DesiredOutputRateChanged(const float &oldValue, const float &newValue)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    if (not this->receivedSRI) {
+        LOG_WARN(TuneFilterDecimate_i, "Can't design filter without input SRI");
+        this->DesiredOutputRate = oldValue;
+        return;
+    }
+
+    if (this->InputRate < newValue) {
+        LOG_ERROR(TuneFilterDecimate_i, "Attempted to set DesiredOutputRate to a value greater than the input sample rate of " << this->InputRate << " Sps");
+        this->DesiredOutputRate = oldValue;
+        return;
+    }
+
+    if (not configureFD()) {
+        LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested DesiredOutputRate");
+        this->DesiredOutputRate = oldValue;
+    }
+}
+
+void TuneFilterDecimate_i::FilterBWChanged(const float &oldValue, const float &newValue)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    if (not this->receivedSRI) {
+        LOG_WARN(TuneFilterDecimate_i, "Can't design filter without input SRI");
+        this->FilterBW = oldValue;
+        return;
+    }
+
+    if (newValue < 0.0) {
+        LOG_WARN(TuneFilterDecimate_i, "Attempted to set FilterBW to a value less than zero");
+        this->FilterBW = oldValue;
+        return;
+    }
+
+    if (not configureFD()) {
+        LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested FilterBW");
+        this->FilterBW = oldValue;
+    }
+}
+
+void TuneFilterDecimate_i::filterPropsChanged(const filterProps_struct &oldValue, const filterProps_struct &newValue)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    if (not this->receivedSRI) {
+        LOG_WARN(TuneFilterDecimate_i, "Can't design filter without input SRI");
+        this->filterProps = oldValue;
+        return;
+    }
+
+    if (newValue.Ripple < 0.0) {
+        LOG_WARN(TuneFilterDecimate_i, "Attempted to set filterProps.Ripple to a value less than zero");
+        this->filterProps = oldValue;
+        return;
+    }
+
+    if (newValue.TransitionWidth < 0.0) {
+        LOG_WARN(TuneFilterDecimate_i, "Attempted to set filterProps.TransitionWidth to a value less than zero");
+        this->filterProps = oldValue;
+        return;
+    }
+
+    if (not configureFD()) {
+        LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested filterProps");
+        this->filterProps = oldValue;
+    }
+}
+
+void TuneFilterDecimate_i::TuningIFChanged(const double &oldValue, const double &newValue)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    LOG_WARN(TuneFilterDecimate_i, "TUNING NOT YET IMPLEMENTED");
+}
+
+void TuneFilterDecimate_i::TuningNormChanged(const double &oldValue, const double &newValue)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    LOG_WARN(TuneFilterDecimate_i, "TUNING NOT YET IMPLEMENTED");
+}
+
+void TuneFilterDecimate_i::TuningRFChanged(const CORBA::ULongLong &oldValue, const CORBA::ULongLong &newValue)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    LOG_WARN(TuneFilterDecimate_i, "TUNING NOT YET IMPLEMENTED");
+}
+
 void TuneFilterDecimate_i::streamChanged(bulkio::InFloatPort::StreamType stream)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     this->sri = stream.sri();
 
-    // Default to complex
-    this->sri.mode = 1;
+    this->InputRate = 1.0 / this->sri.xdelta;
+
+    if (not configureFD(true)) {
+        LOG_ERROR(TuneFilterDecimate_i, "New SRI does not allow for configuration of filter/decimator");
+    }
 
     this->dataFloat_out->pushSRI(this->sri);
 
     this->receivedSRI = true;
+}
+
+bool TuneFilterDecimate_i::configureFD(bool sriChanged)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    float inputSampleRate = 1.0 / this->sri.xdelta;
+    float newDecimationFactor = floor(inputSampleRate / this->DesiredOutputRate);
+    float newActualOutputRate = this->InputRate / newDecimationFactor;
+
+    // These must change when the SRI does
+    if (sriChanged) {
+        this->ActualOutputRate = newActualOutputRate;
+        this->DecimationFactor = newDecimationFactor;
+    }
+
+    LOG_DEBUG(TuneFilterDecimate_i, "New Decimation Factor: " << newDecimationFactor);
+
+    this->sri.xdelta = 1.0 / newActualOutputRate;
+
+    if (newActualOutputRate < this->FilterBW) {
+        LOG_WARN(TuneFilterDecimate_i, "ActualOutputRate " << newActualOutputRate << " is less than FilterBW " << this->FilterBW);
+        return false;
+    }
+
+    // Convert these to the format required by liquid
+    float convertedRipple = -20 * log10(this->filterProps.Ripple);
+    float convertedTransitionWidth = this->filterProps.TransitionWidth / this->InputRate;
+
+    size_t availableFilterLength = this->filter->get_n_taps();
+    size_t estimatedFilterLength = estimate_req_filter_len(convertedTransitionWidth, convertedRipple);
+
+    if (availableFilterLength < estimatedFilterLength) {
+        LOG_WARN(TuneFilterDecimate_i, "Unable to satisfy transition width and/or ripple requirements. Estimated filter length: " << estimatedFilterLength << ", Available filter length: " << availableFilterLength);
+        /*LOG_INFO(TuneFilterDecimate_i, "Attempting to adjust ripple");
+
+        float newRipple = estimate_req_filter_As(convertedTransitionWidth, availableFilterLength);
+
+        LOG_DEBUG(TuneFilterDecimate_i, "Trying ripple: " << pow(10, -newRipple / 20));
+
+        estimatedFilterLength = estimate_req_filter_len(convertedTransitionWidth, newRipple);
+
+        if (availableFilterLength < estimatedFilterLength) {
+            LOG_WARN(TuneFilterDecimate_i, "Unable to satisfy transition width and/or ripple requirements. Estimated filter length: " << estimatedFilterLength << ", Available filter length: " << availableFilterLength);
+            LOG_INFO(TuneFilterDecimate_i, "Attempting to adjust transition width");
+
+            float newTransitionWidth = estimate_req_filter_df(newRipple, availableFilterLength);
+
+            LOG_DEBUG(TuneFilterDecimate_i, "Trying transition width: " << newTransitionWidth * this->InputRate);
+
+            estimatedFilterLength = estimate_req_filter_len(newTransitionWidth, newRipple);
+
+            if (availableFilterLength < estimatedFilterLength) {
+                LOG_ERROR(TuneFilterDecimate_i, "Unable to design filter");
+                return false;
+            }
+
+            LOG_INFO(TuneFilterDecimate_i, "Adjusting filterProps.TransitionWidth property to match available design");
+            this->filterProps.TransitionWidth = newTransitionWidth * this->InputRate;
+        }
+
+        LOG_INFO(TuneFilterDecimate_i, "Adjusting filterProps.Ripple property to match available design");
+        this->filterProps.Ripple = pow(10, -newRipple / 20);*/
+        return false;
+    }
+
+    float cutoff = this->FilterBW / this->InputRate;
+    std::vector<float> kaiserTaps(estimatedFilterLength);
+
+    liquid_firdes_kaiser(availableFilterLength, cutoff, convertedRipple, 0, kaiserTaps.data());
+
+    // Convert the taps to long
+    std::vector<int> longKaiserTaps(kaiserTaps.begin(), kaiserTaps.end());
+
+    // Send the taps to the filter RF-NoC block
+    try {
+        this->filter->set_taps(longKaiserTaps);
+    } catch(uhd::value_error &e) {
+        LOG_ERROR(TuneFilterDecimate_i, "Error while setting taps on filter RF-NoC block: " << e.what());
+        return false;
+    } catch(...) {
+        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting taps on filter RF-NoC block");
+        return false;
+    }
+
+    // Set the decimation factor on the keep-one-in-N RF-NoC block
+    try {
+        this->decimator->set_arg("n", newDecimationFactor);
+    } catch(uhd::value_error &e) {
+        LOG_ERROR(TuneFilterDecimate_i, "Error while setting decimation factor on decimation RF-NoC block: " << e.what());
+        return false;
+    } catch(...) {
+        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting decimation factor on decimation RF-NoC block");
+        return false;
+    }
+
+    if (not sriChanged) {
+        this->ActualOutputRate = this->InputRate / this->DecimationFactor;
+        this->DecimationFactor = newDecimationFactor;
+    }
+
+    return true;
 }
 
 void TuneFilterDecimate_i::retrieveRxStream()

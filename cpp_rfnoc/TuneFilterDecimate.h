@@ -3,6 +3,7 @@
 
 #include "TuneFilterDecimate_base.h"
 
+#include <liquid/liquid.h>
 #include <uhd/device3.hpp>
 #include <uhd/rfnoc/block_ctrl.hpp>
 #include <uhd/rfnoc/fir_block_ctrl.hpp>
@@ -41,35 +42,51 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         void setUsrp(uhd::device3::sptr usrp);
 
     private:
+        // Property listeners
+        void DesiredOutputRateChanged(const float &oldValue, const float &newValue);
+        void FilterBWChanged(const float &oldValue, const float &newValue);
+        void filterPropsChanged(const filterProps_struct &oldValue, const filterProps_struct &newValue);
+        void TuningIFChanged(const double &oldValue, const double &newValue);
+        void TuningNormChanged(const double &oldValue, const double &newValue);
+        void TuningRFChanged(const CORBA::ULongLong &oldValue, const CORBA::ULongLong &newValue);
+
         // Stream listeners
         void streamChanged(bulkio::InFloatPort::StreamType stream);
 
     private:
+        bool configureFD(bool sriChanged = false);
         void retrieveRxStream();
         void retrieveTxStream();
         void startRxStream();
         void stopRxStream();
 
     private:
-        blockIDCallback blockIDChange;
+        // RF-NoC Members
         uhd::rfnoc::block_ctrl_base::sptr decimator;
         const uhd::rfnoc::block_id_t decimatorBlockId;
         uhd::rfnoc::fir_block_ctrl::sptr filter;
         const uhd::rfnoc::block_id_t filterBlockId;
+        uhd::rfnoc::graph::sptr graph;
+        size_t spp;
+        uhd::device3::sptr usrp;
+
+        // UHD Members
+        uhd::rx_streamer::sptr rxStream;
+        uhd::tx_streamer::sptr txStream;
+
+        // Miscellaneous
+        blockIDCallback blockIDChange;
         std::vector<std::complex<float> > floatOutput;
         std::vector<std::complex<short> > output;
         bool receivedSRI;
-        uhd::rx_streamer::sptr rxStream;
         bool rxStreamStarted;
         GenericThreadedComponent *rxThread;
         boost::mutex rxThreadLock;
         std::vector<std::complex<short> > shortInput;
-        size_t spp;
         BULKIO::StreamSRI sri;
-        uhd::tx_streamer::sptr txStream;
         GenericThreadedComponent *txThread;
         boost::mutex txThreadLock;
-        uhd::device3::sptr usrp;
+
 };
 
 #endif // TUNEFILTERDECIMATE_I_IMPL_H
