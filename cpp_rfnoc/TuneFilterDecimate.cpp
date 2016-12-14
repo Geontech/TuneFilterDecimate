@@ -14,11 +14,12 @@ PREPARE_LOGGING(TuneFilterDecimate_i)
 TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) :
     TuneFilterDecimate_base(uuid, label),
     decimatorBlockId("0/KeepOneInN_0"),
+    decimatorSpp(512),
     filterBlockId("0/FIR_0"),
+    filterSpp(512),
     receivedSRI(false),
     rxStreamStarted(false),
     rxThread(NULL),
-    spp(512),
     txThread(NULL)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
@@ -340,7 +341,7 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
         retrieveRxStream();
 
         // Create the receive buffer
-        this->output.resize(10*spp);
+        this->output.resize(10*decimatorSpp);
 
         // Create the RX receive thread
         this->rxThread = new GenericThreadedComponent(boost::bind(&TuneFilterDecimate_i::rxServiceFunction, this));
@@ -709,9 +710,9 @@ void TuneFilterDecimate_i::retrieveRxStream()
     streamer_args["block_id"] = this->decimatorBlockId;
 
     // Get the spp from the block
-    this->spp = this->decimator->get_args().cast<size_t>("spp", 1024);
+    this->decimatorSpp = this->decimator->get_args().cast<size_t>("spp", 1024);
 
-    streamer_args["spp"] = boost::lexical_cast<std::string>(this->spp);
+    streamer_args["spp"] = boost::lexical_cast<std::string>(this->decimatorSpp);
 
     stream_args.args = streamer_args;
 
@@ -745,9 +746,9 @@ void TuneFilterDecimate_i::retrieveTxStream()
     streamer_args["block_id"] = this->filterBlockId;
 
     // Get the spp from the block
-    this->spp = this->filter->get_args().cast<size_t>("spp", 1024);
+    this->filterSpp = this->filter->get_args().cast<size_t>("spp", 1024);
 
-    streamer_args["spp"] = boost::lexical_cast<std::string>(this->spp);
+    streamer_args["spp"] = boost::lexical_cast<std::string>(this->filterSpp);
 
     stream_args.args = streamer_args;
 

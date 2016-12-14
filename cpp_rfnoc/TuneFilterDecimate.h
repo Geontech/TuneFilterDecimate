@@ -64,10 +64,11 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         // RF-NoC Members
         uhd::rfnoc::block_ctrl_base::sptr decimator;
         const uhd::rfnoc::block_id_t decimatorBlockId;
+        size_t decimatorSpp;
         uhd::rfnoc::fir_block_ctrl::sptr filter;
         const uhd::rfnoc::block_id_t filterBlockId;
+        size_t filterSpp;
         uhd::rfnoc::graph::sptr graph;
-        size_t spp;
         uhd::device3::sptr usrp;
 
         // UHD Members
