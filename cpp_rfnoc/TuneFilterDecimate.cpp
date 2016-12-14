@@ -557,8 +557,13 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    float inputSampleRate = 1.0 / this->sri.xdelta;
-    float newDecimationFactor = floor(inputSampleRate / this->DesiredOutputRate);
+    LOG_DEBUG(TuneFilterDecimate_i, "ActualOutputRate: " << this->ActualOutputRate);
+    LOG_DEBUG(TuneFilterDecimate_i, "DecimationFactor: " << this->DecimationFactor);
+    LOG_DEBUG(TuneFilterDecimate_i, "DesiredOutputRate: " << this->DesiredOutputRate);
+    LOG_DEBUG(TuneFilterDecimate_i, "FilterBW: " << this->FilterBW);
+    LOG_DEBUG(TuneFilterDecimate_i, "InputRate: " << this->InputRate);
+
+    float newDecimationFactor = floor(this->InputRate / this->DesiredOutputRate);
     float newActualOutputRate = this->InputRate / newDecimationFactor;
 
     // These must change when the SRI does
