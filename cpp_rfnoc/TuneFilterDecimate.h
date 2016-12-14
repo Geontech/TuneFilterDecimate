@@ -57,6 +57,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         bool configureFD(bool sriChanged = false);
         void retrieveRxStream();
         void retrieveTxStream();
+        void sriChanged(const BULKIO::StreamSRI &newSRI);
         void startRxStream();
         void stopRxStream();
 

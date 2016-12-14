@@ -194,6 +194,11 @@ int TuneFilterDecimate_i::txServiceFunction()
             return NOOP;
         }
 
+        // Respond to the SRI changing
+        if (packet->sriChanged) {
+            sriChanged(packet->SRI);
+        }
+
         // Convert the float data to short data
         this->shortInput.assign(packet->dataBuffer.begin(), packet->dataBuffer.end());
 
@@ -553,17 +558,7 @@ void TuneFilterDecimate_i::streamChanged(bulkio::InFloatPort::StreamType stream)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    this->sri = stream.sri();
-
-    this->InputRate = 1.0 / this->sri.xdelta;
-
-    if (not configureFD(true)) {
-        LOG_ERROR(TuneFilterDecimate_i, "New SRI does not allow for configuration of filter/decimator");
-    }
-
-    this->dataFloat_out->pushSRI(this->sri);
-
-    this->receivedSRI = true;
+    sriChanged(stream.sri());
 }
 
 bool TuneFilterDecimate_i::configureFD(bool sriChanged)
@@ -768,6 +763,23 @@ void TuneFilterDecimate_i::retrieveTxStream()
     } catch(...) {
         LOG_ERROR(TuneFilterDecimate_i, "Unexpected error occurred while retrieving TX stream");
     }
+}
+
+void TuneFilterDecimate_i::sriChanged(const BULKIO::StreamSRI &newSRI)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    this->sri = newSRI;
+
+    this->InputRate = 1.0 / this->sri.xdelta;
+
+    if (not configureFD(true)) {
+        LOG_ERROR(TuneFilterDecimate_i, "New SRI does not allow for configuration of filter/decimator");
+    }
+
+    this->dataFloat_out->pushSRI(this->sri);
+
+    this->receivedSRI = true;
 }
 
 void TuneFilterDecimate_i::startRxStream()
