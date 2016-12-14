@@ -447,7 +447,7 @@ void TuneFilterDecimate_i::DesiredOutputRateChanged(const float &oldValue, const
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    if (not this->receivedSRI) {
+    /*if (not this->receivedSRI) {
         LOG_WARN(TuneFilterDecimate_i, "Can't design filter without input SRI");
         this->DesiredOutputRate = oldValue;
         return;
@@ -457,11 +457,15 @@ void TuneFilterDecimate_i::DesiredOutputRateChanged(const float &oldValue, const
         LOG_ERROR(TuneFilterDecimate_i, "Attempted to set DesiredOutputRate to a value greater than the input sample rate of " << this->InputRate << " Sps");
         this->DesiredOutputRate = oldValue;
         return;
-    }
+    }*/
 
-    if (not configureFD()) {
-        LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested DesiredOutputRate");
-        this->DesiredOutputRate = oldValue;
+    if (this->receivedSRI) {
+        if (not configureFD()) {
+            LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested DesiredOutputRate");
+            this->DesiredOutputRate = oldValue;
+        }
+    } else {
+        LOG_WARN(TuneFilterDecimate_i, "Not designing filter until receiving SRI");
     }
 }
 
@@ -469,11 +473,11 @@ void TuneFilterDecimate_i::FilterBWChanged(const float &oldValue, const float &n
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    if (not this->receivedSRI) {
+    /*if (not this->receivedSRI) {
         LOG_WARN(TuneFilterDecimate_i, "Can't design filter without input SRI");
         this->FilterBW = oldValue;
         return;
-    }
+    }*/
 
     if (newValue < 0.0) {
         LOG_WARN(TuneFilterDecimate_i, "Attempted to set FilterBW to a value less than zero");
@@ -481,9 +485,13 @@ void TuneFilterDecimate_i::FilterBWChanged(const float &oldValue, const float &n
         return;
     }
 
-    if (not configureFD()) {
-        LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested FilterBW");
-        this->FilterBW = oldValue;
+    if (this->receivedSRI) {
+        if (not configureFD()) {
+            LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested FilterBW");
+            this->FilterBW = oldValue;
+        }
+    } else {
+        LOG_WARN(TuneFilterDecimate_i, "Not designing filter until receiving SRI");
     }
 }
 
@@ -491,11 +499,11 @@ void TuneFilterDecimate_i::filterPropsChanged(const filterProps_struct &oldValue
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    if (not this->receivedSRI) {
+    /*if (not this->receivedSRI) {
         LOG_WARN(TuneFilterDecimate_i, "Can't design filter without input SRI");
         this->filterProps = oldValue;
         return;
-    }
+    }*/
 
     if (newValue.Ripple < 0.0) {
         LOG_WARN(TuneFilterDecimate_i, "Attempted to set filterProps.Ripple to a value less than zero");
@@ -509,9 +517,13 @@ void TuneFilterDecimate_i::filterPropsChanged(const filterProps_struct &oldValue
         return;
     }
 
-    if (not configureFD()) {
-        LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested filterProps");
-        this->filterProps = oldValue;
+    if (this->receivedSRI) {
+        if (not configureFD()) {
+            LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested filterProps");
+            this->filterProps = oldValue;
+        }
+    } else {
+        LOG_WARN(TuneFilterDecimate_i, "Not designing filter until receiving SRI");
     }
 }
 
