@@ -83,7 +83,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         bool rxStreamStarted;
         GenericThreadedComponent *rxThread;
         boost::mutex rxThreadLock;
-        std::vector<std::complex<short> > shortInput;
+        std::vector<short> shortInput;
         BULKIO::StreamSRI sri;
         GenericThreadedComponent *txThread;
         boost::mutex txThreadLock;
