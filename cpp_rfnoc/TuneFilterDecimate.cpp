@@ -631,7 +631,7 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
 
     LOG_DEBUG(TuneFilterDecimate_i, "Normalized Cutoff: " << cutoff);
 
-    std::vector<float> filterTaps(estimatedFilterLength);
+    std::vector<float> filterTaps(AvailableFilterLength);
 
     LOG_DEBUG(TuneFilterDecimate_i, "Calculating filter taps...");
 
