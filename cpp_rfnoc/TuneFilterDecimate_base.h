@@ -12,7 +12,7 @@ class TuneFilterDecimate_base : public Component, protected ThreadedComponent
 {
     public:
         TuneFilterDecimate_base(const char *uuid, const char *label);
-        virtual ~TuneFilterDecimate_base();
+        ~TuneFilterDecimate_base();
 
         void start() throw (CF::Resource::StartError, CORBA::SystemException);
 
@@ -52,8 +52,12 @@ class TuneFilterDecimate_base : public Component, protected ThreadedComponent
         // Ports
         /// Port: dataFloat_in
         bulkio::InFloatPort *dataFloat_in;
+        /// Port: dataShort_in
+        bulkio::InShortPort *dataShort_in;
         /// Port: dataFloat_out
         bulkio::OutFloatPort *dataFloat_out;
+        /// Port: dataShort_out
+        bulkio::OutShortPort *dataShort_out;
 
     private:
 };

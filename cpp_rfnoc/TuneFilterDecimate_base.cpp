@@ -18,16 +18,24 @@ TuneFilterDecimate_base::TuneFilterDecimate_base(const char *uuid, const char *l
 
     dataFloat_in = new bulkio::InFloatPort("dataFloat_in");
     addPort("dataFloat_in", dataFloat_in);
+    dataShort_in = new bulkio::InShortPort("dataShort_in");
+    addPort("dataShort_in", dataShort_in);
     dataFloat_out = new bulkio::OutFloatPort("dataFloat_out");
     addPort("dataFloat_out", dataFloat_out);
+    dataShort_out = new bulkio::OutShortPort("dataShort_out");
+    addPort("dataShort_out", dataShort_out);
 }
 
 TuneFilterDecimate_base::~TuneFilterDecimate_base()
 {
     delete dataFloat_in;
     dataFloat_in = 0;
+    delete dataShort_in;
+    dataShort_in = 0;
     delete dataFloat_out;
     dataFloat_out = 0;
+    delete dataShort_out;
+    dataShort_out = 0;
 }
 
 /*******************************************************************************************
@@ -69,7 +77,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readwrite",
                 "",
                 "external",
-                "execparam,configure");
+                "property");
 
     addProperty(TuningNorm,
                 0.0,
@@ -78,7 +86,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readwrite",
                 "",
                 "external",
-                "configure");
+                "property");
 
     addProperty(TuningIF,
                 0,
@@ -87,7 +95,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readwrite",
                 "Hz",
                 "external",
-                "configure");
+                "property");
 
     addProperty(TuningRF,
                 0LL,
@@ -96,7 +104,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readwrite",
                 "Hz",
                 "external",
-                "configure");
+                "property");
 
     addProperty(FilterBW,
                 8000,
@@ -105,7 +113,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readwrite",
                 "Hz",
                 "external",
-                "configure");
+                "property");
 
     addProperty(DesiredOutputRate,
                 10000,
@@ -114,7 +122,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readwrite",
                 "Hz",
                 "external",
-                "configure");
+                "property");
 
     addProperty(ActualOutputRate,
                 "ActualOutputRate",
@@ -122,7 +130,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readonly",
                 "",
                 "external",
-                "configure");
+                "property");
 
     addProperty(InputRF,
                 0.0,
@@ -131,7 +139,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readonly",
                 "Hz",
                 "external",
-                "configure");
+                "property");
 
     addProperty(InputRate,
                 0.0,
@@ -140,7 +148,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readonly",
                 "Hz",
                 "external",
-                "configure");
+                "property");
 
     addProperty(DecimationFactor,
                 "DecimationFactor",
@@ -148,7 +156,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readonly",
                 "",
                 "external",
-                "configure");
+                "property");
 
     addProperty(taps,
                 "taps",
@@ -156,7 +164,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readonly",
                 "",
                 "external",
-                "configure");
+                "property");
 
     addProperty(filterProps,
                 filterProps_struct(),
@@ -165,7 +173,7 @@ void TuneFilterDecimate_base::loadProperties()
                 "readwrite",
                 "",
                 "external",
-                "configure");
+                "property");
 
 }
 

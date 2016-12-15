@@ -112,7 +112,7 @@ void TuneFilterDecimate_i::constructor()
     }
 
     // Add an SRI change listener
-    this->dataFloat_in->addStreamListener(this, &TuneFilterDecimate_i::streamChanged);
+    this->dataShort_in->addStreamListener(this, &TuneFilterDecimate_i::streamChanged);
 
     // Preallocate the vectors
     //this->floatOutput.resize(10000);
@@ -161,19 +161,8 @@ int TuneFilterDecimate_i::rxServiceFunction()
         rxTime.twsec = md.time_spec.get_full_secs();
         rxTime.tfsec = md.time_spec.get_frac_secs();
 
-        // Convert the short data to float data
-        //this->floatOutput.assign(this->output.begin(), this->output.end());
-        this->floatOutput.resize(this->output.size());
-
-        for (size_t i = 0; i < this->floatOutput.size(); ++i) {
-            this->floatOutput[i].real((float) this->output[i].real());
-            this->floatOutput[i].imag((float) this->output[i].imag());
-        }
-
         // Write the data to the output stream
-        float *outputBuffer = (float *) this->floatOutput.data();
-
-        this->dataFloat_out->pushPacket(outputBuffer, this->floatOutput.size() * 2, rxTime, md.end_of_burst, this->sri.streamID._ptr);
+        this->dataShort_out->pushPacket((short *) this->output.data(), this->output.size() * 2, rxTime, md.end_of_burst, this->sri.streamID._ptr);
     }
 
     return NORMAL;
@@ -188,7 +177,7 @@ int TuneFilterDecimate_i::txServiceFunction()
     // Perform TX, if necessary
     if (this->txStream.get()) {
         // Wait on input data
-        bulkio::InFloatPort::DataTransferType *packet = this->dataFloat_in->getPacket(bulkio::Const::BLOCKING);
+        bulkio::InShortPort::DataTransferType *packet = this->dataShort_in->getPacket(bulkio::Const::BLOCKING);
 
         if (not packet) {
             return NOOP;
@@ -199,12 +188,10 @@ int TuneFilterDecimate_i::txServiceFunction()
             sriChanged(packet->SRI);
         }
 
-        // Convert the float data to short data
-        this->shortInput.assign(packet->dataBuffer.begin(), packet->dataBuffer.end());
-
+        // Prepare the metadata
         uhd::tx_metadata_t md;
-        std::complex<short> *block = (std::complex<short> *) this->shortInput.data();
-        size_t blockSize = this->shortInput.size() / 2;
+        std::complex<short> *block = (std::complex<short> *) packet->dataBuffer.data();
+        size_t blockSize = packet->dataBuffer.size() / 2;
 
         LOG_DEBUG(TuneFilterDecimate_i, "TX Thread Received " << blockSize << " samples");
 
@@ -470,7 +457,7 @@ void TuneFilterDecimate_i::DesiredOutputRateChanged(const float &oldValue, const
             LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested DesiredOutputRate");
             this->DesiredOutputRate = oldValue;
         } else {
-            this->dataFloat_out->pushSRI(this->sri);
+            this->dataShort_out->pushSRI(this->sri);
         }
     } else {
         LOG_WARN(TuneFilterDecimate_i, "Not designing filter until receiving SRI");
@@ -779,7 +766,7 @@ void TuneFilterDecimate_i::sriChanged(const BULKIO::StreamSRI &newSRI)
         LOG_ERROR(TuneFilterDecimate_i, "New SRI does not allow for configuration of filter/decimator");
     }
 
-    this->dataFloat_out->pushSRI(this->sri);
+    this->dataShort_out->pushSRI(this->sri);
 
     this->receivedSRI = true;
 }

@@ -78,13 +78,11 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
 
         // Miscellaneous
         blockIDCallback blockIDChange;
-        std::vector<std::complex<float> > floatOutput;
         std::vector<std::complex<short> > output;
         bool receivedSRI;
         bool rxStreamStarted;
         GenericThreadedComponent *rxThread;
         boost::mutex rxThreadLock;
-        std::vector<short> shortInput;
         BULKIO::StreamSRI sri;
         GenericThreadedComponent *txThread;
         boost::mutex txThreadLock;

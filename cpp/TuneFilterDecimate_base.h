@@ -52,8 +52,12 @@ class TuneFilterDecimate_base : public Component, protected ThreadedComponent
         // Ports
         /// Port: dataFloat_in
         bulkio::InFloatPort *dataFloat_in;
+        /// Port: dataShort_in
+        bulkio::InShortPort *dataShort_in;
         /// Port: dataFloat_out
         bulkio::OutFloatPort *dataFloat_out;
+        /// Port: dataShort_out
+        bulkio::OutShortPort *dataShort_out;
 
     private:
 };

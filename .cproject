@@ -43,11 +43,11 @@ program.  If not, see http://www.gnu.org/licenses/.
 								<option id="gnu.cpp.compiler.exe.debug.option.debugging.level.255677226" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1926450524" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${OssieHome}/include&quot;"/>
+									<listOptionValue builtIn="false" value="/home/Patrick/git/uhd/host/include"/>
 									<listOptionValue builtIn="false" value="&quot;${SdrRoot}/dom/deps/rh/dsp/include&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/include/omnithread"/>
 									<listOptionValue builtIn="false" value="/usr/include/omniORB4"/>
 									<listOptionValue builtIn="false" value="&quot;${SdrRoot}/dom/deps/rh/fftlib/include&quot;"/>
-									<listOptionValue builtIn="false" value="/home/Patrick/git/uhd/host/include"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1181145865" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
