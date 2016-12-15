@@ -543,7 +543,7 @@ void TuneFilterDecimate_i::TuningRFChanged(const CORBA::ULongLong &oldValue, con
     LOG_WARN(TuneFilterDecimate_i, "TUNING NOT YET IMPLEMENTED");
 }
 
-void TuneFilterDecimate_i::streamChanged(bulkio::InFloatPort::StreamType stream)
+void TuneFilterDecimate_i::streamChanged(bulkio::InShortPort::StreamType stream)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 

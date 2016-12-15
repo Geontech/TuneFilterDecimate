@@ -51,7 +51,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         void TuningRFChanged(const CORBA::ULongLong &oldValue, const CORBA::ULongLong &newValue);
 
         // Stream listeners
-        void streamChanged(bulkio::InFloatPort::StreamType stream);
+        void streamChanged(bulkio::InShortPort::StreamType stream);
 
     private:
         bool configureFD(bool sriChanged = false);
