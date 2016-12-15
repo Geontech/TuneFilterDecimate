@@ -82,11 +82,8 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         bool receivedSRI;
         bool rxStreamStarted;
         GenericThreadedComponent *rxThread;
-        boost::mutex rxThreadLock;
         BULKIO::StreamSRI sri;
         GenericThreadedComponent *txThread;
-        boost::mutex txThreadLock;
-
 };
 
 #endif // TUNEFILTERDECIMATE_I_IMPL_H
