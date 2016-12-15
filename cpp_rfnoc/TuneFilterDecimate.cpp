@@ -631,11 +631,24 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
 
     LOG_DEBUG(TuneFilterDecimate_i, "Normalized Cutoff: " << cutoff);
 
-    std::vector<float> kaiserTaps(estimatedFilterLength);
+    std::vector<float> filterTaps(estimatedFilterLength);
 
     LOG_DEBUG(TuneFilterDecimate_i, "Calculating filter taps...");
 
-    liquid_firdes_kaiser(estimatedFilterLength, cutoff, convertedRipple, 0, kaiserTaps.data());
+    float bands[2] = {
+            0.0f,                               cutoff,
+            cutoff + convertedTransitionWidth,  0.5
+    };
+
+    float des[2] = { 1.0, this->filterProps.Ripple };
+
+    float weights[2] = { 1.0, 1.0 };
+
+    liquid_firdespm_btype btype = LIQUID_FIRDESPM_BANDPASS;
+    liquid_firdespm_wtype wtype[2] = { LIQUID_FIRDESPM_FLATWEIGHT, LIQUID_FIRDESPM_FLATWEIGHT };
+
+    firdespm_run(availableFilterLength, 2, bands, des, weights, wtype, btype, filterTaps.data());
+    //liquid_firdes_kaiser(estimatedFilterLength, cutoff, convertedRipple, 0, filterTaps.data());
 
     LOG_DEBUG(TuneFilterDecimate_i, "Converting floating point taps to integer taps...");
 
@@ -643,7 +656,7 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     std::vector<int> longKaiserTaps(estimatedFilterLength);
 
     for (size_t i = 0; i < estimatedFilterLength; ++i) {
-        longKaiserTaps[i] = (pow(2, (sizeof(short int) * 8) - 1) - 1) * kaiserTaps[i];
+        longKaiserTaps[i] = (pow(2, (sizeof(short int) * 8) - 1) - 1) * filterTaps[i];
     }
 
     LOG_DEBUG(TuneFilterDecimate_i, "Setting filter taps on RF-NoC block...");
