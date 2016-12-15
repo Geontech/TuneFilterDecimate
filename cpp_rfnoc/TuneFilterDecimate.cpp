@@ -635,12 +635,12 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
 
     LOG_DEBUG(TuneFilterDecimate_i, "Calculating filter taps...");
 
-    float bands[2] = {
+    float bands[4] = {
             0.0f,                               cutoff,
             cutoff + convertedTransitionWidth,  0.5
     };
 
-    float des[2] = { 1.0, this->filterProps.Ripple };
+    float des[2] = { 1.0, (float) this->filterProps.Ripple };
 
     float weights[2] = { 1.0, 1.0 };
 
