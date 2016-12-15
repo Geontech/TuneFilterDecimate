@@ -576,14 +576,14 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     LOG_DEBUG(TuneFilterDecimate_i, "Transition Width (Normalized): " << convertedTransitionWidth);
 
     size_t availableFilterLength = this->filter->get_n_taps();
-    size_t estimatedFilterLength = estimate_req_filter_len(convertedTransitionWidth, convertedRipple);
+    /*size_t estimatedFilterLength = estimate_req_filter_len(convertedTransitionWidth, convertedRipple);
 
     LOG_DEBUG(TuneFilterDecimate_i, "Available Filter Taps: " << availableFilterLength);
     LOG_DEBUG(TuneFilterDecimate_i, "Estimated Filter Taps for design: " << estimatedFilterLength);
 
     if (availableFilterLength < estimatedFilterLength) {
         LOG_WARN(TuneFilterDecimate_i, "Unable to satisfy transition width and/or ripple requirements. Estimated filter length: " << estimatedFilterLength << ", Available filter length: " << availableFilterLength);
-        /*LOG_INFO(TuneFilterDecimate_i, "Attempting to adjust ripple");
+        LOG_INFO(TuneFilterDecimate_i, "Attempting to adjust ripple");
 
         float newRipple = estimate_req_filter_As(convertedTransitionWidth, availableFilterLength);
 
@@ -611,9 +611,9 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
         }
 
         LOG_INFO(TuneFilterDecimate_i, "Adjusting filterProps.Ripple property to match available design");
-        this->filterProps.Ripple = pow(10, -newRipple / 20);*/
+        this->filterProps.Ripple = pow(10, -newRipple / 20);
         return false;
-    }
+    }*/
 
     float cutoff = this->FilterBW / (this->InputRate);
 
@@ -641,9 +641,9 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     LOG_DEBUG(TuneFilterDecimate_i, "Converting floating point taps to integer taps...");
 
     // Convert the taps to long
-    std::vector<int> longKaiserTaps(estimatedFilterLength);
+    std::vector<int> longKaiserTaps(availableFilterLength);
 
-    for (size_t i = 0; i < estimatedFilterLength; ++i) {
+    for (size_t i = 0; i < availableFilterLength; ++i) {
         longKaiserTaps[i] = (pow(2, (sizeof(short int) * 8) - 1) - 1) * filterTaps[i];
     }
 
