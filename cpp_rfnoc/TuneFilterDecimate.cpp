@@ -548,7 +548,7 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     LOG_DEBUG(TuneFilterDecimate_i, "FilterBW: " << this->FilterBW);
     LOG_DEBUG(TuneFilterDecimate_i, "InputRate: " << this->InputRate);
 
-    float newDecimationFactor = floor(this->InputRate / this->DesiredOutputRate);
+    float newDecimationFactor = (int) this->InputRate / (int) this->DesiredOutputRate;
     float newActualOutputRate = this->InputRate / newDecimationFactor;
 
     // These must change when the SRI does
