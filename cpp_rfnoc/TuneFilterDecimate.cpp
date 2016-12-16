@@ -664,7 +664,7 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
 
     // Set the decimation factor on the keep-one-in-N RF-NoC block
     try {
-        this->decimator->set_arg("n", newDecimationFactor);
+        this->decimator->set_arg("n", (int) newDecimationFactor);
     } catch(uhd::value_error &e) {
         LOG_ERROR(TuneFilterDecimate_i, "Error while setting decimation factor on decimation RF-NoC block: " << e.what());
         return false;
