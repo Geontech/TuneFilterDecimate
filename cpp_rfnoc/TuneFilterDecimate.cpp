@@ -135,7 +135,7 @@ int TuneFilterDecimate_i::rxServiceFunction()
         // Recv from the block
         uhd::rx_metadata_t md;
 
-        LOG_DEBUG(TuneFilterDecimate_i, "Calling recv on the rx_stream");
+        LOG_TRACE(TuneFilterDecimate_i, "Calling recv on the rx_stream");
 
         size_t num_rx_samps = this->rxStream->recv(&this->output.front(), this->output.size(), md, 3.0);
 
@@ -150,8 +150,8 @@ int TuneFilterDecimate_i::rxServiceFunction()
             return NOOP;
         }
 
-        LOG_DEBUG(TuneFilterDecimate_i, "RX Thread Requested " << this->output.size() << " samples");
-        LOG_DEBUG(TuneFilterDecimate_i, "RX Thread Received " << num_rx_samps << " samples");
+        LOG_TRACE(TuneFilterDecimate_i, "RX Thread Requested " << this->output.size() << " samples");
+        LOG_TRACE(TuneFilterDecimate_i, "RX Thread Received " << num_rx_samps << " samples");
 
         // Get the time stamps from the meta data
         BULKIO::PrecisionUTCTime rxTime;
@@ -189,10 +189,10 @@ int TuneFilterDecimate_i::txServiceFunction()
         std::complex<short> *block = (std::complex<short> *) packet->dataBuffer.data();
         size_t blockSize = packet->dataBuffer.size() / 2;
 
-        LOG_DEBUG(TuneFilterDecimate_i, "TX Thread Received " << blockSize << " samples");
+        LOG_TRACE(TuneFilterDecimate_i, "TX Thread Received " << blockSize << " samples");
 
         if (blockSize == 0) {
-            LOG_DEBUG(TuneFilterDecimate_i, "Skipping empty packet");
+            LOG_TRACE(TuneFilterDecimate_i, "Skipping empty packet");
             delete packet;
             return NOOP;
         }
@@ -212,7 +212,7 @@ int TuneFilterDecimate_i::txServiceFunction()
             retrieveTxStream();
         }
 
-        LOG_DEBUG(TuneFilterDecimate_i, "TX Thread Sent " << num_tx_samps << " samples");
+        LOG_TRACE(TuneFilterDecimate_i, "TX Thread Sent " << num_tx_samps << " samples");
 
         // On EOS, forward to the RF-NoC Block
         if (packet->EOS) {
@@ -641,17 +641,17 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     LOG_DEBUG(TuneFilterDecimate_i, "Converting floating point taps to integer taps...");
 
     // Convert the taps to long
-    std::vector<int> longKaiserTaps(availableFilterLength);
+    std::vector<int> longFilterTaps(availableFilterLength);
 
     for (size_t i = 0; i < availableFilterLength; ++i) {
-        longKaiserTaps[i] = (pow(2, (sizeof(short int) * 8) - 1) - 1) * filterTaps[i];
+        longFilterTaps[i] = (pow(2, (sizeof(short int) * 8) - 1) - 1) * filterTaps[i];
     }
 
     LOG_DEBUG(TuneFilterDecimate_i, "Setting filter taps on RF-NoC block...");
 
     // Send the taps to the filter RF-NoC block
     try {
-        this->filter->set_taps(longKaiserTaps);
+        this->filter->set_taps(longFilterTaps);
     } catch(uhd::value_error &e) {
         LOG_ERROR(TuneFilterDecimate_i, "Error while setting taps on filter RF-NoC block: " << e.what());
         return false;
@@ -673,10 +673,10 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
         return false;
     }
 
-    this->taps = longKaiserTaps.size();
+    this->taps = longFilterTaps.size();
 
     if (not sriChanged) {
-        this->ActualOutputRate = this->InputRate / this->DecimationFactor;
+        this->ActualOutputRate = newActualOutputRate;
         this->DecimationFactor = newDecimationFactor;
     }
 
