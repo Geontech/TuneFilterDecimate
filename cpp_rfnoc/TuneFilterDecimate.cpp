@@ -289,8 +289,6 @@ void TuneFilterDecimate_i::stop() throw (CF::Resource::StopError, CORBA::SystemE
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    boost::mutex::scoped_lock lock(this->mutex);
-
     if (this->rxThread) {
         if (not this->rxThread->stop()) {
             LOG_WARN(TuneFilterDecimate_i, "RX Thread had to be killed");
