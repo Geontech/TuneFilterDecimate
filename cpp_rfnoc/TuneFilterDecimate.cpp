@@ -153,8 +153,6 @@ void TuneFilterDecimate_i::constructor()
 // Service functions for RX and TX
 int TuneFilterDecimate_i::rxServiceFunction()
 {
-    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
-
     // Perform RX, if necessary
     if (this->rxStream.get()) {
         // Don't bother doing anything until the SRI has been received
@@ -199,8 +197,6 @@ int TuneFilterDecimate_i::rxServiceFunction()
 
 int TuneFilterDecimate_i::txServiceFunction()
 {
-    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
-
     // Perform TX, if necessary
     if (this->txStream.get()) {
         // Wait on input data
