@@ -240,7 +240,7 @@ int TuneFilterDecimate_i::txServiceFunction()
         if (blockSize != 0 and num_tx_samps == 0) {
             LOG_DEBUG(TuneFilterDecimate_i, "The TX stream is no longer valid, obtaining a new one");
 
-            //retrieveTxStream();
+            retrieveTxStream();
         }
 
         LOG_TRACE(TuneFilterDecimate_i, "TX Thread Sent " << num_tx_samps << " samples");
