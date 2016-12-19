@@ -70,6 +70,8 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         const uhd::rfnoc::block_id_t filterBlockId;
         size_t filterSpp;
         uhd::rfnoc::graph::sptr graph;
+        uhd::rfnoc::block_ctrl_base::sptr packetResizer;
+        const uhd::rfnoc::block_id_t packetResizerBlockId;
         uhd::device3::sptr usrp;
 
         // UHD Members

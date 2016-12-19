@@ -17,6 +17,7 @@ TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) 
     decimatorSpp(512),
     filterBlockId("0/FIR_0"),
     filterSpp(512),
+    packetResizerBlockId("0/PacketResizer_0"),
     receivedSRI(false),
     rxStreamStarted(false),
     rxThread(NULL),
@@ -41,6 +42,10 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
         this->filter->clear();
     }
 
+    if (this->packetResizer.get()) {
+        this->packetResizer->clear();
+    }
+
     // Release the threads if necessary
     if (this->rxThread) {
         this->rxThread->stop();
@@ -62,6 +67,7 @@ void TuneFilterDecimate_i::constructor()
     // Grab the pointers to the blocks
     this->decimator = this->usrp->get_block_ctrl<uhd::rfnoc::block_ctrl_base>(this->decimatorBlockId);
     this->filter = this->usrp->get_block_ctrl<uhd::rfnoc::fir_block_ctrl>(this->filterBlockId);
+    this->packetResizer = this->usrp->get_block_ctrl<uhd::rfnoc::block_ctrl_base>(this->packetResizerBlockId);
 
     // Without either of these, there's no need to continue
     if (not this->decimator.get()) {
@@ -78,6 +84,13 @@ void TuneFilterDecimate_i::constructor()
         LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->filterBlockId);
     }
 
+    if (not this->packetResizer.get()) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->packetResizerBlockId);
+        throw CF::LifeCycle::InitializeError();
+    } else {
+        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->packetResizerBlockId);
+    }
+
     // Create a graph
     this->graph = this->usrp->create_graph("TuneFilterDecimate_" + this->_identifier);
 
@@ -88,10 +101,11 @@ void TuneFilterDecimate_i::constructor()
     }
 
     // Connect the blocks
-    this->graph->connect(this->filterBlockId, this->decimatorBlockId);
+    this->graph->connect(this->filterBlockId, this->packetResizerBlockId);
+    this->graph->connect(this->packetResizerBlockId, this->decimatorBlockId);
 
     // Setup based on properties initially
-
+    this->packetResizer->set_arg("pkt_size", 1);
 
     // Register property change listeners
     addPropertyListener(DesiredOutputRate, this, &TuneFilterDecimate_i::DesiredOutputRateChanged); //configureFilter
@@ -113,10 +127,6 @@ void TuneFilterDecimate_i::constructor()
 
     // Add an SRI change listener
     this->dataShort_in->addStreamListener(this, &TuneFilterDecimate_i::streamChanged);
-
-    // Preallocate the vectors
-    //this->floatOutput.resize(10000);
-    //this->output.resize(10000);
 }
 
 // Service functions for RX and TX
@@ -428,18 +438,6 @@ void TuneFilterDecimate_i::DesiredOutputRateChanged(const float &oldValue, const
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    /*if (not this->receivedSRI) {
-        LOG_WARN(TuneFilterDecimate_i, "Can't design filter without input SRI");
-        this->DesiredOutputRate = oldValue;
-        return;
-    }
-
-    if (this->InputRate < newValue) {
-        LOG_ERROR(TuneFilterDecimate_i, "Attempted to set DesiredOutputRate to a value greater than the input sample rate of " << this->InputRate << " Sps");
-        this->DesiredOutputRate = oldValue;
-        return;
-    }*/
-
     if (this->receivedSRI) {
         if (not configureFD()) {
             LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested DesiredOutputRate");
@@ -455,12 +453,6 @@ void TuneFilterDecimate_i::DesiredOutputRateChanged(const float &oldValue, const
 void TuneFilterDecimate_i::FilterBWChanged(const float &oldValue, const float &newValue)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
-
-    /*if (not this->receivedSRI) {
-        LOG_WARN(TuneFilterDecimate_i, "Can't design filter without input SRI");
-        this->FilterBW = oldValue;
-        return;
-    }*/
 
     if (newValue < 0.0) {
         LOG_WARN(TuneFilterDecimate_i, "Attempted to set FilterBW to a value less than zero");
@@ -481,12 +473,6 @@ void TuneFilterDecimate_i::FilterBWChanged(const float &oldValue, const float &n
 void TuneFilterDecimate_i::filterPropsChanged(const filterProps_struct &oldValue, const filterProps_struct &newValue)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
-
-    /*if (not this->receivedSRI) {
-        LOG_WARN(TuneFilterDecimate_i, "Can't design filter without input SRI");
-        this->filterProps = oldValue;
-        return;
-    }*/
 
     if (newValue.Ripple < 0.0) {
         LOG_WARN(TuneFilterDecimate_i, "Attempted to set filterProps.Ripple to a value less than zero");
@@ -576,44 +562,6 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     LOG_DEBUG(TuneFilterDecimate_i, "Transition Width (Normalized): " << convertedTransitionWidth);
 
     size_t availableFilterLength = this->filter->get_n_taps();
-    /*size_t estimatedFilterLength = estimate_req_filter_len(convertedTransitionWidth, convertedRipple);
-
-    LOG_DEBUG(TuneFilterDecimate_i, "Available Filter Taps: " << availableFilterLength);
-    LOG_DEBUG(TuneFilterDecimate_i, "Estimated Filter Taps for design: " << estimatedFilterLength);
-
-    if (availableFilterLength < estimatedFilterLength) {
-        LOG_WARN(TuneFilterDecimate_i, "Unable to satisfy transition width and/or ripple requirements. Estimated filter length: " << estimatedFilterLength << ", Available filter length: " << availableFilterLength);
-        LOG_INFO(TuneFilterDecimate_i, "Attempting to adjust ripple");
-
-        float newRipple = estimate_req_filter_As(convertedTransitionWidth, availableFilterLength);
-
-        LOG_DEBUG(TuneFilterDecimate_i, "Trying ripple: " << pow(10, -newRipple / 20));
-
-        estimatedFilterLength = estimate_req_filter_len(convertedTransitionWidth, newRipple);
-
-        if (availableFilterLength < estimatedFilterLength) {
-            LOG_WARN(TuneFilterDecimate_i, "Unable to satisfy transition width and/or ripple requirements. Estimated filter length: " << estimatedFilterLength << ", Available filter length: " << availableFilterLength);
-            LOG_INFO(TuneFilterDecimate_i, "Attempting to adjust transition width");
-
-            float newTransitionWidth = estimate_req_filter_df(newRipple, availableFilterLength);
-
-            LOG_DEBUG(TuneFilterDecimate_i, "Trying transition width: " << newTransitionWidth * this->InputRate);
-
-            estimatedFilterLength = estimate_req_filter_len(newTransitionWidth, newRipple);
-
-            if (availableFilterLength < estimatedFilterLength) {
-                LOG_ERROR(TuneFilterDecimate_i, "Unable to design filter");
-                return false;
-            }
-
-            LOG_INFO(TuneFilterDecimate_i, "Adjusting filterProps.TransitionWidth property to match available design");
-            this->filterProps.TransitionWidth = newTransitionWidth * this->InputRate;
-        }
-
-        LOG_INFO(TuneFilterDecimate_i, "Adjusting filterProps.Ripple property to match available design");
-        this->filterProps.Ripple = pow(10, -newRipple / 20);
-        return false;
-    }*/
 
     float cutoff = this->FilterBW / (this->InputRate);
 
@@ -636,7 +584,6 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     liquid_firdespm_wtype wtype[2] = { LIQUID_FIRDESPM_FLATWEIGHT, LIQUID_FIRDESPM_FLATWEIGHT };
 
     firdespm_run(availableFilterLength, 2, bands, des, weights, wtype, btype, filterTaps.data());
-    //liquid_firdes_kaiser(estimatedFilterLength, cutoff, convertedRipple, 0, filterTaps.data());
 
     LOG_DEBUG(TuneFilterDecimate_i, "Converting floating point taps to integer taps...");
 
