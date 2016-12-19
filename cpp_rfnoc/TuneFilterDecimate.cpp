@@ -155,6 +155,8 @@ int TuneFilterDecimate_i::rxServiceFunction()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
+    boost::mutex::scoped_lock lock(this->mutex);
+
     // Perform RX, if necessary
     if (this->rxStream.get()) {
         // Don't bother doing anything until the SRI has been received
@@ -200,6 +202,8 @@ int TuneFilterDecimate_i::rxServiceFunction()
 int TuneFilterDecimate_i::txServiceFunction()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    boost::mutex::scoped_lock lock(this->mutex);
 
     // Perform TX, if necessary
     if (this->txStream.get()) {
@@ -268,6 +272,8 @@ void TuneFilterDecimate_i::start() throw (CF::Resource::StartError, CORBA::Syste
 
     TuneFilterDecimate_base::start();
 
+    boost::mutex::scoped_lock lock(this->mutex);
+
     if (this->rxThread) {
         startRxStream();
 
@@ -282,6 +288,8 @@ void TuneFilterDecimate_i::start() throw (CF::Resource::StartError, CORBA::Syste
 void TuneFilterDecimate_i::stop() throw (CF::Resource::StopError, CORBA::SystemException)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    boost::mutex::scoped_lock lock(this->mutex);
 
     if (this->rxThread) {
         if (not this->rxThread->stop()) {
@@ -460,6 +468,8 @@ void TuneFilterDecimate_i::DesiredOutputRateChanged(const float &oldValue, const
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     if (this->receivedSRI) {
+        boost::mutex::scoped_lock lock(this->mutex);
+
         if (not configureFD()) {
             LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested DesiredOutputRate");
             this->DesiredOutputRate = oldValue;
@@ -482,6 +492,8 @@ void TuneFilterDecimate_i::FilterBWChanged(const float &oldValue, const float &n
     }
 
     if (this->receivedSRI) {
+        boost::mutex::scoped_lock lock(this->mutex);
+
         if (not configureFD()) {
             LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested FilterBW");
             this->FilterBW = oldValue;
@@ -508,6 +520,8 @@ void TuneFilterDecimate_i::filterPropsChanged(const filterProps_struct &oldValue
     }
 
     if (this->receivedSRI) {
+        boost::mutex::scoped_lock lock(this->mutex);
+
         if (not configureFD()) {
             LOG_ERROR(TuneFilterDecimate_i, "Unable to configure filter/decimator with requested filterProps");
             this->filterProps = oldValue;
@@ -541,6 +555,8 @@ void TuneFilterDecimate_i::TuningRFChanged(const CORBA::ULongLong &oldValue, con
 void TuneFilterDecimate_i::streamChanged(bulkio::InShortPort::StreamType stream)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    boost::mutex::scoped_lock lock(this->mutex);
 
     sriChanged(stream.sri());
 }
