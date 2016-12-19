@@ -79,7 +79,6 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
 
         // Miscellaneous
         blockIDCallback blockIDChange;
-        boost::mutex mutex;
         std::vector<std::complex<short> > output;
         bool receivedSRI;
         bool rxStreamStarted;
