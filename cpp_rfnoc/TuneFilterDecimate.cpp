@@ -60,7 +60,7 @@ void TuneFilterDecimate_i::constructor()
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Grab the pointers to the blocks
-    uhd::rfnoc::block_ctrl_base tmpDdc;
+    uhd::rfnoc::ddc_block_ctrl::sptr tmpDdc;
     size_t tmpDdcPort = -1;
 
     std::vector<uhd::rfnoc::block_id_t> ddcs = this->usrp->find_blocks("DDC");
@@ -80,7 +80,7 @@ void TuneFilterDecimate_i::constructor()
                 tmpDdc->get_upstream_port(j);
 
                 LOG_DEBUG(TuneFilterDecimate_i, "Port is in use");
-            } catch(uhd) {
+            } catch(uhd::value_error &e) {
                 tmpDdcPort = j;
 
                 LOG_DEBUG(TuneFilterDecimate_i, "Port is not in use");
