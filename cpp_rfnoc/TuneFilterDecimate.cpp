@@ -677,10 +677,10 @@ void TuneFilterDecimate_i::retrieveRxStream()
     // Get the spp from the block
     this->decimatorSpp = this->ddc->get_args().cast<size_t>("spp", 1024);
 
+    streamer_args["port"] = this->ddcPort;
     streamer_args["spp"] = boost::lexical_cast<std::string>(this->decimatorSpp);
 
     stream_args.args = streamer_args;
-    stream_args.channels = boost::assign::list_of(this->ddcPort);
 
     LOG_DEBUG(TuneFilterDecimate_i, "Using streamer arguments: " << stream_args.args.to_string());
 
