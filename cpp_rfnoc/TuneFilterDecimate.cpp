@@ -71,7 +71,7 @@ void TuneFilterDecimate_i::constructor()
         uhd::rfnoc::ddc_block_ctrl::sptr tmpDdc = this->usrp->get_block_ctrl<uhd::rfnoc::ddc_block_ctrl>(ddcs[i]);
         std::vector<size_t> inputPorts = tmpDdc->get_input_ports();
 
-        LOG_DEBUG(TuneFilterDecimate_i, "Found " << inputPorts.size() << " on block " << ddcs[i]);
+        LOG_DEBUG(TuneFilterDecimate_i, "Found " << inputPorts.size() << " ports on block " << ddcs[i]);
 
         for (size_t j = 0; j < inputPorts.size(); ++j) {
             LOG_DEBUG(TuneFilterDecimate_i, "Check port " << j);
@@ -123,7 +123,7 @@ void TuneFilterDecimate_i::constructor()
     }
 
     // Connect the blocks
-    this->graph->connect(this->filterBlockId, 0, this->ddc->get_block_id(), this->ddcPort);
+    this->graph->connect(this->filterBlockId, uhd::rfnoc::ANY_PORT, this->ddc->get_block_id(), this->ddcPort);
 
     // Setup based on properties initially
 
@@ -244,7 +244,7 @@ int TuneFilterDecimate_i::txServiceFunction()
         if (blockSize != 0 and num_tx_samps == 0) {
             LOG_DEBUG(TuneFilterDecimate_i, "The TX stream is no longer valid, obtaining a new one");
 
-            retrieveTxStream();
+            //retrieveTxStream();
         }
 
         LOG_TRACE(TuneFilterDecimate_i, "TX Thread Sent " << num_tx_samps << " samples");
