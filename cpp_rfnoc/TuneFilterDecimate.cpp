@@ -105,7 +105,7 @@ void TuneFilterDecimate_i::constructor()
     this->graph->connect(this->packetResizerBlockId, this->decimatorBlockId);
 
     // Setup based on properties initially
-    this->packetResizer->set_arg("pkt_size", 1);
+    this->packetResizer->set_arg("pkt_size", 2);
 
     // Register property change listeners
     addPropertyListener(DesiredOutputRate, this, &TuneFilterDecimate_i::DesiredOutputRateChanged); //configureFilter
