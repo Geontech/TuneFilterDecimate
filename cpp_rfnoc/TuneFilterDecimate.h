@@ -6,6 +6,7 @@
 #include <liquid/liquid.h>
 #include <uhd/device3.hpp>
 #include <uhd/rfnoc/block_ctrl.hpp>
+#include <uhd/rfnoc/ddc_block_ctrl.hpp>
 #include <uhd/rfnoc/fir_block_ctrl.hpp>
 #include <uhd/rfnoc/graph.hpp>
 
@@ -63,15 +64,13 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
 
     private:
         // RF-NoC Members
-        uhd::rfnoc::block_ctrl_base::sptr decimator;
-        const uhd::rfnoc::block_id_t decimatorBlockId;
+        uhd::rfnoc::ddc_block_ctrl::sptr ddc;
+        size_t ddcPort;
         size_t decimatorSpp;
         uhd::rfnoc::fir_block_ctrl::sptr filter;
         const uhd::rfnoc::block_id_t filterBlockId;
         size_t filterSpp;
         uhd::rfnoc::graph::sptr graph;
-        uhd::rfnoc::block_ctrl_base::sptr packetResizer;
-        const uhd::rfnoc::block_id_t packetResizerBlockId;
         uhd::device3::sptr usrp;
 
         // UHD Members

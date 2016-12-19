@@ -13,11 +13,10 @@ PREPARE_LOGGING(TuneFilterDecimate_i)
 
 TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) :
     TuneFilterDecimate_base(uuid, label),
-    decimatorBlockId("0/KeepOneInN_0"),
+    ddcPort(-1),
     decimatorSpp(512),
     filterBlockId("0/FIR_0"),
     filterSpp(512),
-    packetResizerBlockId("0/PacketResizer_0"),
     receivedSRI(false),
     rxStreamStarted(false),
     rxThread(NULL),
@@ -34,16 +33,12 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
     stopRxStream();
 
     // Reset the RF-NoC blocks
-    if (this->decimator.get()) {
-        this->decimator->clear();
+    if (this->ddc.get()) {
+        this->ddc->clear();
     }
 
     if (this->filter.get()) {
         this->filter->clear();
-    }
-
-    if (this->packetResizer.get()) {
-        this->packetResizer->clear();
     }
 
     // Release the threads if necessary
@@ -65,16 +60,50 @@ void TuneFilterDecimate_i::constructor()
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Grab the pointers to the blocks
-    this->decimator = this->usrp->get_block_ctrl<uhd::rfnoc::block_ctrl_base>(this->decimatorBlockId);
+    uhd::rfnoc::block_ctrl_base tmpDdc;
+    size_t tmpDdcPort = -1;
+
+    std::vector<uhd::rfnoc::block_id_t> ddcs = this->usrp->find_blocks("DDC");
+
+    LOG_DEBUG(TuneFilterDecimate_i, "Found " << ddcs.size() << " DDCs");
+
+    for (size_t i = 0; i < ddcs.size(); ++i) {
+        uhd::rfnoc::ddc_block_ctrl::sptr tmpDdc = this->usrp->get_block_ctrl<uhd::rfnoc::ddc_block_ctrl>(ddcs[i]);
+        std::vector<size_t> inputPorts = tmpDdc->get_input_ports();
+
+        LOG_DEBUG(TuneFilterDecimate_i, "Found " << inputPorts.size() << " on block " << ddcs[i]);
+
+        for (size_t j = 0; j < inputPorts.size(); ++j) {
+            LOG_DEBUG(TuneFilterDecimate_i, "Check port " << j);
+
+            try {
+                tmpDdc->get_upstream_port(j);
+
+                LOG_DEBUG(TuneFilterDecimate_i, "Port is in use");
+            } catch(uhd) {
+                tmpDdcPort = j;
+
+                LOG_DEBUG(TuneFilterDecimate_i, "Port is not in use");
+                break;
+            }
+        }
+
+        if (tmpDdcPort != -1) {
+            this->ddc = tmpDdc;
+            this->ddcPort = tmpDdcPort;
+
+            break;
+        }
+    }
+
     this->filter = this->usrp->get_block_ctrl<uhd::rfnoc::fir_block_ctrl>(this->filterBlockId);
-    this->packetResizer = this->usrp->get_block_ctrl<uhd::rfnoc::block_ctrl_base>(this->packetResizerBlockId);
 
     // Without either of these, there's no need to continue
-    if (not this->decimator.get()) {
-        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->decimatorBlockId);
+    if (not this->ddc.get()) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->ddc->get_block_id());
         throw CF::LifeCycle::InitializeError();
     } else {
-        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->decimatorBlockId);
+        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->ddc->get_block_id());
     }
 
     if (not this->filter.get()) {
@@ -82,13 +111,6 @@ void TuneFilterDecimate_i::constructor()
         throw CF::LifeCycle::InitializeError();
     } else {
         LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->filterBlockId);
-    }
-
-    if (not this->packetResizer.get()) {
-        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->packetResizerBlockId);
-        throw CF::LifeCycle::InitializeError();
-    } else {
-        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->packetResizerBlockId);
     }
 
     // Create a graph
@@ -101,11 +123,10 @@ void TuneFilterDecimate_i::constructor()
     }
 
     // Connect the blocks
-    this->graph->connect(this->filterBlockId, this->packetResizerBlockId);
-    this->graph->connect(this->packetResizerBlockId, this->decimatorBlockId);
+    this->graph->connect(this->filterBlockId, 0, this->ddc->get_block_id(), this->ddcPort);
 
     // Setup based on properties initially
-    this->packetResizer->set_arg("pkt_size", 2);
+
 
     // Register property change listeners
     addPropertyListener(DesiredOutputRate, this, &TuneFilterDecimate_i::DesiredOutputRateChanged); //configureFilter
@@ -119,7 +140,7 @@ void TuneFilterDecimate_i::constructor()
     if (this->blockIDChange) {
         std::vector<uhd::rfnoc::block_id_t> blocks;
 
-        blocks.push_back(this->decimatorBlockId);
+        blocks.push_back(this->ddc->get_block_id());
         blocks.push_back(this->filterBlockId);
 
         this->blockIDChange(this->_identifier, blocks);
@@ -609,14 +630,24 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
 
     LOG_DEBUG(TuneFilterDecimate_i, "Setting decimation factor on RF-NoC block...");
 
-    // Set the decimation factor on the keep-one-in-N RF-NoC block
+    // Set the rates on the DDC RF-NoC block
     try {
-        this->decimator->set_arg("n", (int) newDecimationFactor);
+        this->ddc->set_arg("input_rate", this->InputRate, this->ddcPort);
     } catch(uhd::value_error &e) {
-        LOG_ERROR(TuneFilterDecimate_i, "Error while setting decimation factor on decimation RF-NoC block: " << e.what());
+        LOG_ERROR(TuneFilterDecimate_i, "Error while setting input rate on DDC RF-NoC block: " << e.what());
         return false;
     } catch(...) {
-        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting decimation factor on decimation RF-NoC block");
+        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting input rate on DDC RF-NoC block");
+        return false;
+    }
+
+    try {
+        this->ddc->set_arg("output_rate", this->ActualOutputRate, this->ddcPort);
+    } catch(uhd::value_error &e) {
+        LOG_ERROR(TuneFilterDecimate_i, "Error while setting output rate on DDC RF-NoC block: " << e.what());
+        return false;
+    } catch(...) {
+        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting output rate on DDC RF-NoC block");
         return false;
     }
 
@@ -645,10 +676,10 @@ void TuneFilterDecimate_i::retrieveRxStream()
     uhd::stream_args_t stream_args("sc16", "sc16");
     uhd::device_addr_t streamer_args;
 
-    streamer_args["block_id"] = this->decimatorBlockId;
+    streamer_args["block_id"] = this->ddc->get_block_id();
 
     // Get the spp from the block
-    this->decimatorSpp = this->decimator->get_args().cast<size_t>("spp", 1024);
+    this->decimatorSpp = this->ddc->get_args().cast<size_t>("spp", 1024);
 
     streamer_args["spp"] = boost::lexical_cast<std::string>(this->decimatorSpp);
 
