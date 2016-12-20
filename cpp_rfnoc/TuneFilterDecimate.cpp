@@ -630,8 +630,8 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     try {
         uhd::device_addr_t args;
 
-        args["input_rate"] = this->InputRate;
-        args["output_rate"] = newActualOutputRate;
+        args["input_rate"] = boost::lexical_cast<std::string>(this->InputRate);
+        args["output_rate"] = boost::lexical_cast<std::string>(newActualOutputRate);
 
         this->ddc->set_args(args, this->ddcPort);
     } catch(uhd::value_error &e) {
