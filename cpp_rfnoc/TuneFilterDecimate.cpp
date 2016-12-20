@@ -15,6 +15,8 @@ TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) 
     TuneFilterDecimate_base(uuid, label),
     ddcPort(-1),
     decimatorSpp(512),
+    eob(false),
+    expectEob(false),
     filterBlockId("0/FIR_0"),
     filterSpp(512),
     receivedSRI(false),
@@ -189,7 +191,12 @@ int TuneFilterDecimate_i::rxServiceFunction()
         rxTime.tfsec = md.time_spec.get_frac_secs();
 
         // Write the data to the output stream
-        this->dataShort_out->pushPacket((short *) this->output.data(), this->output.size() * 2, rxTime, md.end_of_burst, this->sri.streamID._ptr);
+        if (md.end_of_burst and this->expectEob) {
+            this->dataShort_out->pushPacket((short *) this->output.data(), this->output.size() * 2, rxTime, false, this->sri.streamID._ptr);
+            this->expectEob = false;
+        } else {
+            this->dataShort_out->pushPacket((short *) this->output.data(), this->output.size() * 2, rxTime, md.end_of_burst, this->sri.streamID._ptr);
+        }
     }
 
     return NORMAL;
@@ -227,8 +234,14 @@ int TuneFilterDecimate_i::txServiceFunction()
         // Get the timestamp to send to the RF-NoC block
         BULKIO::PrecisionUTCTime time = packet->T;
 
+        md.end_of_burst = this->eob;
         md.has_time_spec = true;
         md.time_spec = uhd::time_spec_t(time.twsec, time.tfsec);
+
+        if (this->eob) {
+            this->eob = false;
+            this->expectEob = true;
+        }
 
         // Send the data
         size_t num_tx_samps = this->txStream->send(block, blockSize, md);
@@ -642,12 +655,16 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
         return false;
     }
 
+    // Set the property for the number of taps
     this->taps = longFilterTaps.size();
 
     if (not sriChanged) {
         this->ActualOutputRate = newActualOutputRate;
         this->DecimationFactor = newDecimationFactor;
     }
+
+    // Send EOB to update the DDC decimation
+    this->eob = true;
 
     return true;
 }

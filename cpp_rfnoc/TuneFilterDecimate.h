@@ -79,6 +79,8 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
 
         // Miscellaneous
         blockIDCallback blockIDChange;
+        bool eob;
+        bool expectEob;
         std::vector<std::complex<short> > output;
         bool receivedSRI;
         bool rxStreamStarted;
