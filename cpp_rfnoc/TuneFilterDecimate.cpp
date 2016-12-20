@@ -628,22 +628,17 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
 
     // Set the rates on the DDC RF-NoC block
     try {
-        this->ddc->set_arg("input_rate", this->InputRate, this->ddcPort);
-    } catch(uhd::value_error &e) {
-        LOG_ERROR(TuneFilterDecimate_i, "Error while setting input rate on DDC RF-NoC block: " << e.what());
-        return false;
-    } catch(...) {
-        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting input rate on DDC RF-NoC block");
-        return false;
-    }
+        uhd::device_addr_t args;
 
-    try {
-        this->ddc->set_arg("output_rate", this->ActualOutputRate, this->ddcPort);
+        args["input_rate"] = this->InputRate;
+        args["output_rate"] = newActualOutputRate;
+
+        this->ddc->set_args(args, this->ddcPort);
     } catch(uhd::value_error &e) {
-        LOG_ERROR(TuneFilterDecimate_i, "Error while setting output rate on DDC RF-NoC block: " << e.what());
+        LOG_ERROR(TuneFilterDecimate_i, "Error while setting rates on DDC RF-NoC block: " << e.what());
         return false;
     } catch(...) {
-        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting output rate on DDC RF-NoC block");
+        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting rates on DDC RF-NoC block");
         return false;
     }
 
