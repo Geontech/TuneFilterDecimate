@@ -37,11 +37,11 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
 
     // Reset the RF-NoC blocks
     if (this->ddc.get()) {
-        this->ddc->clear();
+        this->ddc->clear(this->ddcPort);
     }
 
     if (this->filter.get()) {
-        this->filter->clear();
+        this->filter->clear(this->filterPort);
     }
 
     // Release the threads if necessary
