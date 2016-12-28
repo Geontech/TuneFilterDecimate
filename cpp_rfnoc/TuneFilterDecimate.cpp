@@ -148,6 +148,8 @@ void TuneFilterDecimate_i::constructor()
         this->blockIDChange(this->_identifier, blocks);
     }
 
+    LOG_DEBUG(TuneFilterDecimate_i, "Adding a stream listener");
+
     // Add an SRI change listener
     this->dataShort_in->addStreamListener(this, &TuneFilterDecimate_i::streamChanged);
 }
