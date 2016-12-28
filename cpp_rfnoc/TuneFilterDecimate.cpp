@@ -7,6 +7,7 @@
 
 **************************************************************************/
 
+#include "RFNoC_Utils.h"
 #include "TuneFilterDecimate.h"
 
 PREPARE_LOGGING(TuneFilterDecimate_i)
@@ -17,7 +18,7 @@ TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) 
     decimatorSpp(512),
     eob(false),
     expectEob(false),
-    filterBlockId("0/FIR_0"),
+    filterPort(-1),
     filterSpp(512),
     receivedSRI(false),
     rxStreamStarted(false),
@@ -61,46 +62,33 @@ void TuneFilterDecimate_i::constructor()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    // Grab the pointers to the blocks
-    uhd::rfnoc::ddc_block_ctrl::sptr tmpDdc;
-    size_t tmpDdcPort = -1;
-
-    std::vector<uhd::rfnoc::block_id_t> ddcs = this->usrp->find_blocks("DDC");
-
-    LOG_DEBUG(TuneFilterDecimate_i, "Found " << ddcs.size() << " DDCs");
-
-    for (size_t i = 0; i < ddcs.size(); ++i) {
-        uhd::rfnoc::ddc_block_ctrl::sptr tmpDdc = this->usrp->get_block_ctrl<uhd::rfnoc::ddc_block_ctrl>(ddcs[i]);
-        std::vector<size_t> inputPorts = tmpDdc->get_input_ports();
-
-        LOG_DEBUG(TuneFilterDecimate_i, "Found " << inputPorts.size() << " ports on block " << ddcs[i]);
-
-        for (size_t j = 0; j < inputPorts.size(); ++j) {
-            LOG_DEBUG(TuneFilterDecimate_i, "Check port " << j);
-
-            try {
-                tmpDdc->get_upstream_port(j);
-
-                LOG_DEBUG(TuneFilterDecimate_i, "Port is in use");
-            } catch(uhd::value_error &e) {
-                tmpDdcPort = j;
-
-                LOG_DEBUG(TuneFilterDecimate_i, "Port is not in use");
-                break;
-            }
-        }
-
-        if (tmpDdcPort != -1) {
-            this->ddc = tmpDdc;
-            this->ddcPort = tmpDdcPort;
-
-            break;
-        }
-    }
-
-    this->filter = this->usrp->get_block_ctrl<uhd::rfnoc::fir_block_ctrl>(this->filterBlockId);
+    // Find available sinks and sources
+    BlockInfo ddcInfo = findAvailableSink(this->usrp, "DDC");
+    BlockInfo firInfo = findAvailableSource(this->usrp, "FIR");
 
     // Without either of these, there's no need to continue
+    if (not uhd::rfnoc::block_id_t::is_valid_block_id(ddcInfo.blockID)) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'DDC'");
+        throw CF::LifeCycle::InitializeError();
+    } else if (ddcInfo.port == size_t(-1)) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'DDC' with available port");
+        throw CF::LifeCycle::InitializeError();
+    }
+
+    if (not uhd::rfnoc::block_id_t::is_valid_block_id(firInfo.blockID)) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'FIR'");
+        throw CF::LifeCycle::InitializeError();
+    } else if (firInfo.port == size_t(-1)) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'FIR' with available port");
+        throw CF::LifeCycle::InitializeError();
+    }
+
+    // Get the pointers to the blocks
+    this->ddc = this->usrp->get_block_ctrl<uhd::rfnoc::ddc_block_ctrl>(ddcInfo.blockID);
+    this->ddcPort = ddcInfo.port;
+    this->filter = this->usrp->get_block_ctrl<uhd::rfnoc::fir_block_ctrl>(firInfo.blockID);
+    this->filterPort = firInfo.port;
+
     if (not this->ddc.get()) {
         LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->ddc->get_block_id());
         throw CF::LifeCycle::InitializeError();
@@ -109,10 +97,10 @@ void TuneFilterDecimate_i::constructor()
     }
 
     if (not this->filter.get()) {
-        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->filterBlockId);
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->filter->get_block_id());
         throw CF::LifeCycle::InitializeError();
     } else {
-        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->filterBlockId);
+        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->filter->get_block_id());
     }
 
     // Create a graph
@@ -125,7 +113,7 @@ void TuneFilterDecimate_i::constructor()
     }
 
     // Connect the blocks
-    this->graph->connect(this->filterBlockId, uhd::rfnoc::ANY_PORT, this->ddc->get_block_id(), this->ddcPort);
+    this->graph->connect(this->filter->get_block_id(), this->filterPort, this->ddc->get_block_id(), this->ddcPort);
 
     // Setup based on properties initially
 
@@ -139,13 +127,13 @@ void TuneFilterDecimate_i::constructor()
     addPropertyListener(TuningRF, this, &TuneFilterDecimate_i::TuningRFChanged); //configureTuner
 
     // Alert the persona of the block IDs
-    if (this->blockIDChange) {
-        std::vector<uhd::rfnoc::block_id_t> blocks;
+    if (this->blockInfoChange) {
+        std::vector<BlockInfo> blocks(2);
 
-        blocks.push_back(this->ddc->get_block_id());
-        blocks.push_back(this->filterBlockId);
+        blocks[0] = firInfo;
+        blocks[1] = ddcInfo;
 
-        this->blockIDChange(this->_identifier, blocks);
+        this->blockInfoChange(this->_identifier, blocks);
     }
 
     LOG_DEBUG(TuneFilterDecimate_i, "Adding a stream listener");
@@ -334,15 +322,15 @@ void TuneFilterDecimate_i::releaseObject() throw (CF::LifeCycle::ReleaseError, C
 }
 
 /*
- * A method which allows a callback to be set for the block ID changing. This
+ * A method which allows a callback to be set for the block info changing. This
  * callback should point back to the persona to alert it of the component's
- * block IDs
+ * block IDs and ports
  */
-void TuneFilterDecimate_i::setBlockIDCallback(blockIDCallback cb)
+void TuneFilterDecimate_i::setBlockInfoCallback(blockInfoCallback cb)
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
-    this->blockIDChange = cb;
+    this->blockInfoChange = cb;
 }
 
 /*
@@ -723,7 +711,7 @@ void TuneFilterDecimate_i::retrieveTxStream()
     uhd::stream_args_t stream_args("sc16", "sc16");
     uhd::device_addr_t streamer_args;
 
-    streamer_args["block_id"] = this->filterBlockId;
+    streamer_args["block_id"] = this->filter->get_block_id();
 
     // Get the spp from the block
     this->filterSpp = this->filter->get_args().cast<size_t>("spp", 1024);

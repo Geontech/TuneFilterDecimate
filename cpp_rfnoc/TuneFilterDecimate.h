@@ -37,7 +37,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         void releaseObject() throw (CF::LifeCycle::ReleaseError, CORBA::SystemException);
 
         // Methods to be called by the persona, inherited from RFNoC_ComponentInterface
-        void setBlockIDCallback(blockIDCallback cb);
+        void setBlockInfoCallback(blockInfoCallback cb);
         void setRxStreamer(bool enable);
         void setTxStreamer(bool enable);
         void setUsrp(uhd::device3::sptr usrp);
@@ -68,7 +68,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         size_t ddcPort;
         size_t decimatorSpp;
         uhd::rfnoc::fir_block_ctrl::sptr filter;
-        const uhd::rfnoc::block_id_t filterBlockId;
+        size_t filterPort;
         size_t filterSpp;
         uhd::rfnoc::graph::sptr graph;
         uhd::device3::sptr usrp;
@@ -78,7 +78,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         uhd::tx_streamer::sptr txStream;
 
         // Miscellaneous
-        blockIDCallback blockIDChange;
+        blockInfoCallback blockInfoChange;
         bool eob;
         bool expectEob;
         std::vector<std::complex<short> > output;

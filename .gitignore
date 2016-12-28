@@ -24,6 +24,7 @@ cpp_rfnoc/.libs/libTuneFilterDecimate.so.0
 cpp_rfnoc/.libs/libTuneFilterDecimate.so.0.0.0
 cpp_rfnoc/libTuneFilterDecimate.la
 cpp_rfnoc/libTuneFilterDecimate_la-GenericThreadedComponent.lo
+cpp_rfnoc/libTuneFilterDecimate_la-RFNoC_Utils.lo
 cpp_rfnoc/libTuneFilterDecimate_la-TuneFilterDecimate.lo
 cpp_rfnoc/libTuneFilterDecimate_la-TuneFilterDecimate_base.lo
 cpp_rfnoc/libTuneFilterDecimate_la-main.lo

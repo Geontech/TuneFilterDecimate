@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "RFNoC_Utils.h"
+
 /*
  * A callback on the component to be called by the persona. This lets the
  * persona inform the component of its status as an RX and/or TX endpoint to the
@@ -27,7 +29,7 @@ typedef boost::function<void(const std::string &componentID, setStreamerCallback
  * component inform the persona which RF-NoC block(s) the component is
  * claiming.
  */
-typedef boost::function<void(const std::string &componentID, const std::vector<uhd::rfnoc::block_id_t> &blockIDs)> blockIDCallback;
+typedef boost::function<void(const std::string &componentID, const std::vector<BlockInfo> &blockInfos)> blockInfoCallback;
 
 /*
  * An abstract base class to be implemented by an RF-NoC component designer.
@@ -38,7 +40,7 @@ class RFNoC_ComponentInterface {
          * This method should keep a copy of the blockIDCallback and/or call it
          * with the component's block ID(s).
          */
-        virtual void setBlockIDCallback(blockIDCallback cb) = 0;
+        virtual void setBlockInfoCallback(blockInfoCallback cb) = 0;
 
         /*
          * This method should enable streaming from the component's last/only
