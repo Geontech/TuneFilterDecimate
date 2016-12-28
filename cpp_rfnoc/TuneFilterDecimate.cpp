@@ -150,7 +150,26 @@ int TuneFilterDecimate_i::rxServiceFunction()
         // Don't bother doing anything until the SRI has been received
         if (not this->receivedSRI) {
             LOG_DEBUG(TuneFilterDecimate_i, "RX Thread active but no SRI has been received");
-            return NOOP;
+
+            if (not this->txThread) {
+                bulkio::InShortPort::DataTransferType *packet = this->dataShort_in->getPacket(bulkio::Const::NON_BLOCKING);
+
+                if (not packet) {
+                    return NOOP;
+                }
+
+                bool updated = packet->sriChanged;
+
+                if (updated) {
+                    sriChanged(packet->SRI);
+                }
+
+                delete packet;
+
+                if (not updated) {
+                    return NOOP;
+                }
+            }
         }
 
         // Recv from the block

@@ -10,6 +10,11 @@
 
 #include "RFNoC_Utils.h"
 
+bool operator==(const BlockInfo &lhs, const BlockInfo &rhs)
+{
+    return (lhs.blockID == rhs.blockID and lhs.port == rhs.port);
+}
+
 BlockInfo findAvailableSink(const uhd::device3::sptr usrp, const std::string &blockID)
 {
     std::vector<uhd::rfnoc::block_id_t> blockIDs = usrp->find_blocks(blockID);

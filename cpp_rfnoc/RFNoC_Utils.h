@@ -18,6 +18,8 @@ struct BlockInfo {
     size_t port;
 };
 
+bool operator==(const BlockInfo &lhs, const BlockInfo &rhs);
+
 BlockInfo findAvailableSink(const uhd::device3::sptr usrp, const std::string &blockID);
 
 BlockInfo findAvailableSource(const uhd::device3::sptr usrp, const std::string &blockID);
