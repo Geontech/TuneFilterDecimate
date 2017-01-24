@@ -190,6 +190,12 @@ int TuneFilterDecimate_i::rxServiceFunction()
             return NOOP;
         }
 
+        if (this->output.size() != num_rx_samps) {
+            LOG_DEBUG(TuneFilterDecimate_i, "The RX stream is no longer valid, obtaining a new one");
+
+            retrieveRxStream();
+        }
+
         LOG_TRACE(TuneFilterDecimate_i, "RX Thread Requested " << this->output.size() << " samples");
         LOG_TRACE(TuneFilterDecimate_i, "RX Thread Received " << num_rx_samps << " samples");
 
@@ -735,6 +741,7 @@ void TuneFilterDecimate_i::retrieveTxStream()
     // Get the spp from the block
     this->filterSpp = this->filter->get_args().cast<size_t>("spp", 1024);
 
+    streamer_args["block_port"] = boost::lexical_cast<std::string>(this->filterPort);
     streamer_args["spp"] = boost::lexical_cast<std::string>(this->filterSpp);
 
     stream_args.args = streamer_args;
