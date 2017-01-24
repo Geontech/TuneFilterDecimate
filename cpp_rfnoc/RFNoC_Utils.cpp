@@ -41,12 +41,15 @@ BlockInfo findAvailableChannel(const uhd::device3::sptr usrp, const std::string 
         for (size_t j = 0; j < numFullChannels; ++j) {
             try {
                 sinkBlock->get_upstream_port(j);
-                sourceBlock->get_downstream_port(j);
             } catch(uhd::value_error &e) {
-                blockInfo.blockID = blockIDs[i];
-                blockInfo.port = j;
+                try {
+                    sourceBlock->get_downstream_port(j);
+                } catch(uhd::value_error &e) {
+                    blockInfo.blockID = blockIDs[i];
+                    blockInfo.port = j;
 
-                return blockInfo;
+                    return blockInfo;
+                }
             }
         }
     }
