@@ -63,8 +63,8 @@ void TuneFilterDecimate_i::constructor()
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Find available sinks and sources
-    BlockInfo ddcInfo = findAvailableSink(this->usrp, "DDC");
-    BlockInfo firInfo = findAvailableSource(this->usrp, "FIR");
+    BlockInfo ddcInfo = findAvailableChannel(this->usrp, "DDC");
+    BlockInfo firInfo = findAvailableChannel(this->usrp, "FIR");
 
     // Without either of these, there's no need to continue
     if (not uhd::rfnoc::block_id_t::is_valid_block_id(ddcInfo.blockID)) {

@@ -20,6 +20,8 @@ struct BlockInfo {
 
 bool operator==(const BlockInfo &lhs, const BlockInfo &rhs);
 
+BlockInfo findAvailableChannel(const uhd::device3::sptr usrp, const std::string &blockID);
+
 BlockInfo findAvailableSink(const uhd::device3::sptr usrp, const std::string &blockID);
 
 BlockInfo findAvailableSource(const uhd::device3::sptr usrp, const std::string &blockID);
