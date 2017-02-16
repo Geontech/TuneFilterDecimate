@@ -190,11 +190,11 @@ int TuneFilterDecimate_i::rxServiceFunction()
             return NOOP;
         }
 
-        if (this->output.size() != num_rx_samps) {
+        /*if (this->output.size() != num_rx_samps) {
             LOG_DEBUG(TuneFilterDecimate_i, "The RX stream is no longer valid, obtaining a new one");
 
             retrieveRxStream();
-        }
+        }*/
 
         LOG_TRACE(TuneFilterDecimate_i, "RX Thread Requested " << this->output.size() << " samples");
         LOG_TRACE(TuneFilterDecimate_i, "RX Thread Received " << num_rx_samps << " samples");
@@ -380,7 +380,7 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
         retrieveRxStream();
 
         // Create the receive buffer
-        this->output.resize(10*decimatorSpp);
+        this->output.resize((0.8 * bulkio::Const::MAX_TRANSFER_BYTES / sizeof(std::complex<short>)));
 
         // Create the RX receive thread
         this->rxThread = new GenericThreadedComponent(boost::bind(&TuneFilterDecimate_i::rxServiceFunction, this));
