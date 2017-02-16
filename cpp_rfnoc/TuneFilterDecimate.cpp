@@ -182,6 +182,13 @@ int TuneFilterDecimate_i::rxServiceFunction()
         // Check the meta data for error codes
         if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
             LOG_ERROR(TuneFilterDecimate_i, "Timeout while streaming");
+            // Start continuous streaming
+            uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+            stream_cmd.num_samps = 0;
+            stream_cmd.stream_now = true;
+            stream_cmd.time_spec = uhd::time_spec_t();
+
+            this->rxStream->issue_stream_cmd(stream_cmd);
             return NOOP;
         } else if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
             LOG_WARN(TuneFilterDecimate_i, "Overflow while streaming");
