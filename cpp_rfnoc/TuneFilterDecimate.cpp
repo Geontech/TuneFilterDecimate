@@ -14,7 +14,7 @@ PREPARE_LOGGING(TuneFilterDecimate_i)
 
 TuneFilterDecimate_i::TuneFilterDecimate_i(const char *uuid, const char *label) :
     TuneFilterDecimate_base(uuid, label),
-    ddcPort(-1),
+    decimatorPort(-1),
     decimatorSpp(512),
     eob(false),
     expectEob(false),
@@ -35,15 +35,6 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
     // Stop streaming
     stopRxStream();
 
-    // Reset the RF-NoC blocks
-    if (this->ddc.get()) {
-        this->ddc->clear(this->ddcPort);
-    }
-
-    if (this->filter.get()) {
-        this->filter->clear(this->filterPort);
-    }
-
     // Release the threads if necessary
     if (this->rxThread) {
         this->rxThread->stop();
@@ -55,7 +46,14 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
         delete this->txThread;
     }
 
-    LOG_INFO(TuneFilterDecimate_i, "END OF DESTRUCTOR");
+    // Reset the RF-NoC blocks
+    if (this->decimator.get()) {
+        this->decimator->clear(this->decimatorPort);
+    }
+
+    if (this->filter.get()) {
+        this->filter->clear(this->filterPort);
+    }
 }
 
 void TuneFilterDecimate_i::constructor()
@@ -63,15 +61,15 @@ void TuneFilterDecimate_i::constructor()
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Find available sinks and sources
-    BlockInfo ddcInfo = findAvailableChannel(this->usrp, "DDC");
+    BlockInfo decimatorInfo = findAvailableChannel(this->usrp, "decimator");
     BlockInfo firInfo = findAvailableChannel(this->usrp, "FIR");
 
     // Without either of these, there's no need to continue
-    if (not uhd::rfnoc::block_id_t::is_valid_block_id(ddcInfo.blockID)) {
-        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'DDC'");
+    if (not uhd::rfnoc::block_id_t::is_valid_block_id(decimatorInfo.blockID)) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'decimator'");
         throw CF::LifeCycle::InitializeError();
-    } else if (ddcInfo.port == size_t(-1)) {
-        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'DDC' with available port");
+    } else if (decimatorInfo.port == size_t(-1)) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'decimator' with available port");
         throw CF::LifeCycle::InitializeError();
     }
 
@@ -84,16 +82,16 @@ void TuneFilterDecimate_i::constructor()
     }
 
     // Get the pointers to the blocks
-    this->ddc = this->usrp->get_block_ctrl<uhd::rfnoc::ddc_block_ctrl>(ddcInfo.blockID);
-    this->ddcPort = ddcInfo.port;
+    this->decimator = this->usrp->get_block_ctrl<uhd::rfnoc::block_ctrl_base>(decimatorInfo.blockID);
+    this->decimatorPort = decimatorInfo.port;
     this->filter = this->usrp->get_block_ctrl<uhd::rfnoc::fir_block_ctrl>(firInfo.blockID);
     this->filterPort = firInfo.port;
 
-    if (not this->ddc.get()) {
-        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->ddc->get_block_id());
+    if (not this->decimator.get()) {
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to retrieve RF-NoC block with ID: " << this->decimator->get_block_id());
         throw CF::LifeCycle::InitializeError();
     } else {
-        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->ddc->get_block_id());
+        LOG_DEBUG(TuneFilterDecimate_i, "Got the block: " << this->decimator->get_block_id());
     }
 
     if (not this->filter.get()) {
@@ -113,7 +111,7 @@ void TuneFilterDecimate_i::constructor()
     }
 
     // Connect the blocks
-    this->graph->connect(this->filter->get_block_id(), this->filterPort, this->ddc->get_block_id(), this->ddcPort);
+    this->graph->connect(this->filter->get_block_id(), this->filterPort, this->decimator->get_block_id(), this->decimatorPort);
 
     // Setup based on properties initially
 
@@ -131,7 +129,7 @@ void TuneFilterDecimate_i::constructor()
         std::vector<BlockInfo> blocks(2);
 
         blocks[0] = firInfo;
-        blocks[1] = ddcInfo;
+        blocks[1] = decimatorInfo;
 
         this->blockInfoChange(this->_identifier, blocks);
     }
@@ -140,6 +138,9 @@ void TuneFilterDecimate_i::constructor()
 
     // Add an SRI change listener
     this->dataShort_in->addStreamListener(this, &TuneFilterDecimate_i::streamChanged);
+
+    this->dataShort_out->setNewConnectListener(this, &TuneFilterDecimate_i::newConnection);
+    this->dataShort_out->setNewConnectListener(this, &TuneFilterDecimate_i::newDisconnection);
 }
 
 // Service functions for RX and TX
@@ -150,61 +151,39 @@ int TuneFilterDecimate_i::rxServiceFunction()
         // Don't bother doing anything until the SRI has been received
         if (not this->receivedSRI) {
             LOG_DEBUG(TuneFilterDecimate_i, "RX Thread active but no SRI has been received");
-
-            if (not this->txThread) {
-                bulkio::InShortPort::DataTransferType *packet = this->dataShort_in->getPacket(bulkio::Const::NON_BLOCKING);
-
-                if (not packet) {
-                    return NOOP;
-                }
-
-                bool updated = packet->sriChanged;
-
-                if (updated) {
-                    sriChanged(packet->SRI);
-                }
-
-                delete packet;
-
-                if (not updated) {
-                    return NOOP;
-                }
-            }
+            return NOOP;
         }
 
         // Recv from the block
         uhd::rx_metadata_t md;
 
-        LOG_TRACE(TuneFilterDecimate_i, "Calling recv on the rx_stream");
+        size_t samplesRead = 0;
+        size_t samplesToRead = this->output.size();
 
-        size_t num_rx_samps = this->rxStream->recv(&this->output.front(), this->output.size(), md, 3.0);
+        while (samplesRead < this->output.size()) {
+            LOG_DEBUG(TuneFilterDecimate_i, "Calling recv on the rx_stream");
 
-        // Check the meta data for error codes
-        if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
-            LOG_ERROR(TuneFilterDecimate_i, "Timeout while streaming");
-            // Start continuous streaming
-            uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
-            stream_cmd.num_samps = 0;
-            stream_cmd.stream_now = true;
-            stream_cmd.time_spec = uhd::time_spec_t();
+            size_t num_rx_samps = this->rxStream->recv(&output.front() + samplesRead, samplesToRead, md, 1.0);
 
-            this->rxStream->issue_stream_cmd(stream_cmd);
-            return NOOP;
-        } else if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
-            LOG_WARN(TuneFilterDecimate_i, "Overflow while streaming");
-        } else if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
-            LOG_WARN(TuneFilterDecimate_i, md.strerror());
-            return NOOP;
+            // Check the meta data for error codes
+            if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+                LOG_ERROR(TuneFilterDecimate_i, "Timeout while streaming");
+                return NOOP;
+            } else if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
+                LOG_WARN(TuneFilterDecimate_i, "Overflow while streaming");
+            } else if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
+                LOG_WARN(TuneFilterDecimate_i, md.strerror());
+                this->rxStreamStarted = false;
+                startRxStream();
+                return NOOP;
+            }
+
+            LOG_DEBUG(TuneFilterDecimate_i, "RX Thread Requested " << samplesToRead << " samples");
+            LOG_DEBUG(TuneFilterDecimate_i, "RX Thread Received " << num_rx_samps << " samples");
+
+            samplesRead += num_rx_samps;
+            samplesToRead -= num_rx_samps;
         }
-
-        /*if (this->output.size() != num_rx_samps) {
-            LOG_DEBUG(TuneFilterDecimate_i, "The RX stream is no longer valid, obtaining a new one");
-
-            retrieveRxStream();
-        }*/
-
-        LOG_TRACE(TuneFilterDecimate_i, "RX Thread Requested " << this->output.size() << " samples");
-        LOG_TRACE(TuneFilterDecimate_i, "RX Thread Received " << num_rx_samps << " samples");
 
         // Get the time stamps from the meta data
         BULKIO::PrecisionUTCTime rxTime;
@@ -266,15 +245,18 @@ int TuneFilterDecimate_i::txServiceFunction()
         }
 
         // Send the data
-        size_t num_tx_samps = this->txStream->send(block, blockSize, md);
+        size_t samplesSent = 0;
+        size_t samplesToSend = blockSize;
 
-        if (blockSize != 0 and num_tx_samps == 0) {
-            LOG_DEBUG(TuneFilterDecimate_i, "The TX stream is no longer valid, obtaining a new one");
+        while (samplesToSend != 0) {
+            // Send the data
+            size_t num_tx_samps = this->txStream->send(block + samplesSent, samplesToSend, md, 1);
 
-            retrieveTxStream();
+            samplesSent += num_tx_samps;
+            samplesToSend -= num_tx_samps;
+
+            LOG_DEBUG(TuneFilterDecimate_i, "TX Thread Sent " << num_tx_samps << " samples");
         }
-
-        LOG_TRACE(TuneFilterDecimate_i, "TX Thread Sent " << num_tx_samps << " samples");
 
         // On EOS, forward to the RF-NoC Block
         if (packet->EOS) {
@@ -287,9 +269,10 @@ int TuneFilterDecimate_i::txServiceFunction()
         }
 
         delete packet;
+        return NORMAL;
     }
 
-    return NORMAL;
+    return NOOP;
 }
 
 // Override start and stop
@@ -365,6 +348,34 @@ void TuneFilterDecimate_i::setBlockInfoCallback(blockInfoCallback cb)
     this->blockInfoChange = cb;
 }
 
+void TuneFilterDecimate_i::setNewIncomingConnectionCallback(connectionCallback cb)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    this->newIncomingConnectionCallback = cb;
+}
+
+void TuneFilterDecimate_i::setNewOutgoingConnectionCallback(connectionCallback cb)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    this->newOutgoingConnectionCallback = cb;
+}
+
+void TuneFilterDecimate_i::setRemovedIncomingConnectionCallback(connectionCallback cb)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    this->removedIncomingConnectionCallback = cb;
+}
+
+void TuneFilterDecimate_i::setRemovedOutgoingConnectionCallback(connectionCallback cb)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    this->removedOutgoingConnectionCallback = cb;
+}
+
 /*
  * A method which allows the persona to set this component as an RX streamer.
  * This means the component should retrieve the data from block and then send
@@ -384,7 +395,10 @@ void TuneFilterDecimate_i::setRxStreamer(bool enable)
         LOG_DEBUG(TuneFilterDecimate_i, "Attempting to set RX streamer");
 
         // Get the RX stream
-        retrieveRxStream();
+        if (not retrieveRxStream()) {
+            LOG_WARN(TuneFilterDecimate_i, "Failed to retrieve RX stream");
+            return;
+        }
 
         // Create the receive buffer
         this->output.resize((0.8 * bulkio::Const::MAX_TRANSFER_BYTES / sizeof(std::complex<short>)));
@@ -440,7 +454,10 @@ void TuneFilterDecimate_i::setTxStreamer(bool enable)
         LOG_DEBUG(TuneFilterDecimate_i, "Attempting to set TX streamer");
 
         // Get the TX stream
-        retrieveTxStream();
+        if (not retrieveTxStream()) {
+            LOG_WARN(TuneFilterDecimate_i, "Failed to retrieve TX stream");
+            return;
+        }
 
         // Create the TX transmit thread
         this->txThread = new GenericThreadedComponent(boost::bind(&TuneFilterDecimate_i::txServiceFunction, this));
@@ -665,15 +682,14 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     try {
         uhd::device_addr_t args;
 
-        args["input_rate"] = boost::lexical_cast<std::string>(this->InputRate);
-        args["output_rate"] = boost::lexical_cast<std::string>(newActualOutputRate);
+        args["decimation_factor"] = boost::lexical_cast<int>(newDecimationFactor);
 
-        this->ddc->set_args(args, this->ddcPort);
+        this->decimator->set_args(args, this->decimatorPort);
     } catch(uhd::value_error &e) {
-        LOG_ERROR(TuneFilterDecimate_i, "Error while setting rates on DDC RF-NoC block: " << e.what());
+        LOG_ERROR(TuneFilterDecimate_i, "Error while setting decimation factor on decimation RF-NoC block: " << e.what());
         return false;
     } catch(...) {
-        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting rates on DDC RF-NoC block");
+        LOG_ERROR(TuneFilterDecimate_i, "Unknown error occurred while setting decimation factor on decimator RF-NoC block");
         return false;
     }
 
@@ -691,7 +707,29 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     return true;
 }
 
-void TuneFilterDecimate_i::retrieveRxStream()
+void TuneFilterDecimate_i::newConnection(const char *connectionID)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    if (this->newOutgoingConnectionCallback) {
+        BULKIO::UsesPortStatisticsProvider_ptr port = BULKIO::UsesPortStatisticsProvider::_narrow(this->getPort(this->dataShort_out->getName().c_str()));
+
+        this->newOutgoingConnectionCallback(connectionID, port->_hash(HASH_SIZE));
+    }
+}
+
+void TuneFilterDecimate_i::newDisconnection(const char *connectionID)
+{
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+
+    if (this->removedOutgoingConnectionCallback) {
+        BULKIO::UsesPortStatisticsProvider_ptr port = BULKIO::UsesPortStatisticsProvider::_narrow(this->getPort(this->dataShort_out->getName().c_str()));
+
+        this->removedOutgoingConnectionCallback(connectionID, port->_hash(HASH_SIZE));
+    }
+}
+
+bool TuneFilterDecimate_i::retrieveRxStream()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
@@ -706,12 +744,12 @@ void TuneFilterDecimate_i::retrieveRxStream()
     uhd::stream_args_t stream_args("sc16", "sc16");
     uhd::device_addr_t streamer_args;
 
-    streamer_args["block_id"] = this->ddc->get_block_id();
+    streamer_args["block_id"] = this->decimator->get_block_id();
 
     // Get the spp from the block
-    this->decimatorSpp = this->ddc->get_args().cast<size_t>("spp", 1024);
+    this->decimatorSpp = this->decimator->get_args().cast<size_t>("spp", 1024);
 
-    streamer_args["block_port"] = boost::lexical_cast<std::string>(this->ddcPort);
+    streamer_args["block_port"] = boost::lexical_cast<std::string>(this->decimatorPort);
     streamer_args["spp"] = boost::lexical_cast<std::string>(this->decimatorSpp);
 
     stream_args.args = streamer_args;
@@ -723,12 +761,16 @@ void TuneFilterDecimate_i::retrieveRxStream()
         this->rxStream = this->usrp->get_rx_stream(stream_args);
     } catch(uhd::runtime_error &e) {
         LOG_ERROR(TuneFilterDecimate_i, "Failed to retrieve RX stream: " << e.what());
+        return false;
     } catch(...) {
         LOG_ERROR(TuneFilterDecimate_i, "Unexpected error occurred while retrieving RX stream");
+        return false;
     }
+
+    return true;
 }
 
-void TuneFilterDecimate_i::retrieveTxStream()
+bool TuneFilterDecimate_i::retrieveTxStream()
 {
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
@@ -760,9 +802,13 @@ void TuneFilterDecimate_i::retrieveTxStream()
         this->txStream = this->usrp->get_tx_stream(stream_args);
     } catch(uhd::runtime_error &e) {
         LOG_ERROR(TuneFilterDecimate_i, "Failed to retrieve TX stream: " << e.what());
+        return false;
     } catch(...) {
         LOG_ERROR(TuneFilterDecimate_i, "Unexpected error occurred while retrieving TX stream");
+        return false;
     }
+
+    return true;
 }
 
 void TuneFilterDecimate_i::sriChanged(const BULKIO::StreamSRI &newSRI)
@@ -810,5 +856,17 @@ void TuneFilterDecimate_i::stopRxStream()
         this->rxStream->issue_stream_cmd(stream_cmd);
 
         this->rxStreamStarted = false;
+
+        // Run recv until nothing is left
+        uhd::rx_metadata_t md;
+        int num_post_samps = 0;
+
+        LOG_DEBUG(TuneFilterDecimate_i, "Emptying receive queue...");
+
+        do {
+            num_post_samps = this->rxStream->recv(&this->output.front(), this->output.size(), md, 1.0);
+        } while(num_post_samps and md.error_code == uhd::rx_metadata_t::ERROR_CODE_NONE);
+
+        LOG_DEBUG(TuneFilterDecimate_i, "Emptied receive queue");
     }
 }

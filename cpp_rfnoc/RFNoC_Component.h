@@ -32,15 +32,46 @@ typedef boost::function<void(const std::string &componentID, setStreamerCallback
 typedef boost::function<void(const std::string &componentID, const std::vector<BlockInfo> &blockInfos)> blockInfoCallback;
 
 /*
+ * A callback on the persona to be called by the component. This lets the
+ * component inform the persona of incoming/outgoing connections being added or
+ * removed
+ */
+typedef boost::function<void(const std::string &ID, const CORBA::ULong &hash)> connectionCallback;
+
+/*
  * An abstract base class to be implemented by an RF-NoC component designer.
  */
 class RFNoC_ComponentInterface {
     public:
         /*
-         * This method should keep a copy of the blockIDCallback and/or call it
-         * with the component's block ID(s).
+         * This method should keep a copy of the blockInfoCallback and/or call it
+         * with the component's block info(s).
          */
         virtual void setBlockInfoCallback(blockInfoCallback cb) = 0;
+
+        /*
+         * This method should keep a copy of the connectionCallback to be called
+         * when a new connection on the provides port occurs
+         */
+        virtual void setNewIncomingConnectionCallback(connectionCallback cb) = 0;
+
+        /*
+         * This method should keep a copy of the connectionCallback to be called
+         * when a new connection on the uses port occurs
+         */
+        virtual void setNewOutgoingConnectionCallback(connectionCallback cb) = 0;
+
+        /*
+         * This method should keep a copy of the connectionCallback to be called
+         * when a connection is removed on the provides port
+         */
+        virtual void setRemovedIncomingConnectionCallback(connectionCallback cb) = 0;
+
+        /*
+         * This method should keep a copy of the connectionCallback to be called
+         * when a connection is removed on the uses port
+         */
+        virtual void setRemovedOutgoingConnectionCallback(connectionCallback cb) = 0;
 
         /*
          * This method should enable streaming from the component's last/only

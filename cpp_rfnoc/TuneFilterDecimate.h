@@ -38,6 +38,10 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
 
         // Methods to be called by the persona, inherited from RFNoC_ComponentInterface
         void setBlockInfoCallback(blockInfoCallback cb);
+        void setNewIncomingConnectionCallback(connectionCallback cb);
+        void setNewOutgoingConnectionCallback(connectionCallback cb);
+        void setRemovedIncomingConnectionCallback(connectionCallback cb);
+        void setRemovedOutgoingConnectionCallback(connectionCallback cb);
         void setRxStreamer(bool enable);
         void setTxStreamer(bool enable);
         void setUsrp(uhd::device3::sptr usrp);
@@ -56,16 +60,18 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
 
     private:
         bool configureFD(bool sriChanged = false);
-        void retrieveRxStream();
-        void retrieveTxStream();
+        void newConnection(const char *connectionID);
+        void newDisconnection(const char *connectionID);
+        bool retrieveRxStream();
+        bool retrieveTxStream();
         void sriChanged(const BULKIO::StreamSRI &newSRI);
         void startRxStream();
         void stopRxStream();
 
     private:
         // RF-NoC Members
-        uhd::rfnoc::ddc_block_ctrl::sptr ddc;
-        size_t ddcPort;
+        uhd::rfnoc::block_ctrl_base::sptr decimator;
+        size_t decimatorPort;
         size_t decimatorSpp;
         uhd::rfnoc::fir_block_ctrl::sptr filter;
         size_t filterPort;
