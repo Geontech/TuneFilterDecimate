@@ -588,7 +588,30 @@ void TuneFilterDecimate_i::TuningRFChanged(const CORBA::ULongLong &oldValue, con
 
 void TuneFilterDecimate_i::streamChanged(bulkio::InShortPort::StreamType stream)
 {
-    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
+    std::map<std::string, bool>::iterator it = this->streamMap.find(stream.streamID());
+
+    bool newIncomingConnection = (it == this->streamMap.end());
+    bool removedIncomingConnection =(it != this->streamMap.end() and stream.eos());
+
+    if (newIncomingConnection) {
+        LOG_DEBUG(TuneFilterDecimate_i, "New incoming connection");
+
+        if (this->newIncomingConnectionCallback) {
+            this->newIncomingConnectionCallback(stream.streamID(), this->dataShort_in->_this()->_hash(HASH_SIZE));
+        }
+
+        this->streamMap[stream.streamID()] = true;
+    } else if (removedIncomingConnection) {
+        LOG_DEBUG(TuneFilterDecimate_i, "Removed incoming connection");
+
+        if (this->removedIncomingConnectionCallback) {
+            this->removedIncomingConnectionCallback(stream.streamID(), this->dataShort_in->_this()->_hash(HASH_SIZE));
+        }
+
+        this->streamMap.erase(it);
+    }
+
+    LOG_DEBUG(TuneFilterDecimate_i, "Got SRI for stream ID: " << stream.streamID());
 
     sriChanged(stream.sri());
 }

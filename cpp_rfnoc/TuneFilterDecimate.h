@@ -99,6 +99,7 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         bool rxStreamStarted;
         GenericThreadedComponent *rxThread;
         BULKIO::StreamSRI sri;
+        std::map<std::string, bool> streamMap;
         GenericThreadedComponent *txThread;
 };
 
