@@ -48,11 +48,11 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
 
     // Reset the RF-NoC blocks
     if (this->decimator.get()) {
-        this->decimator->clear(this->decimatorPort);
+        this->decimator->clear();
     }
 
     if (this->filter.get()) {
-        this->filter->clear(this->filterPort);
+        this->filter->clear();
     }
 }
 

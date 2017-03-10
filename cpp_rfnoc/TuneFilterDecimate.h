@@ -87,6 +87,10 @@ class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_Compon
         blockInfoCallback blockInfoChange;
         bool eob;
         bool expectEob;
+        connectionCallback newIncomingConnectionCallback;
+        connectionCallback newOutgoingConnectionCallback;
+        connectionCallback removedIncomingConnectionCallback;
+        connectionCallback removedOutgoingConnectionCallback;
         std::vector<std::complex<short> > output;
         bool receivedSRI;
         bool rxStreamStarted;
