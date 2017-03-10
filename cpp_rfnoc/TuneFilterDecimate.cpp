@@ -682,7 +682,7 @@ bool TuneFilterDecimate_i::configureFD(bool sriChanged)
     try {
         uhd::device_addr_t args;
 
-        args["decimation_factor"] = boost::lexical_cast<int>(newDecimationFactor);
+        args["decimation_factor"] = boost::lexical_cast<std::string>(newDecimationFactor);
 
         this->decimator->set_args(args, this->decimatorPort);
     } catch(uhd::value_error &e) {
