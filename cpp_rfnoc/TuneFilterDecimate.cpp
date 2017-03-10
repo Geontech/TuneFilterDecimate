@@ -140,7 +140,7 @@ void TuneFilterDecimate_i::constructor()
     this->dataShort_in->addStreamListener(this, &TuneFilterDecimate_i::streamChanged);
 
     this->dataShort_out->setNewConnectListener(this, &TuneFilterDecimate_i::newConnection);
-    this->dataShort_out->setNewConnectListener(this, &TuneFilterDecimate_i::newDisconnection);
+    this->dataShort_out->setNewDisconnectListener(this, &TuneFilterDecimate_i::newDisconnection);
 }
 
 // Service functions for RX and TX
