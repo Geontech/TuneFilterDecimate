@@ -61,15 +61,15 @@ void TuneFilterDecimate_i::constructor()
     LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__);
 
     // Find available sinks and sources
-    BlockInfo decimatorInfo = findAvailableChannel(this->usrp, "decimator");
+    BlockInfo decimatorInfo = findAvailableChannel(this->usrp, "decimate");
     BlockInfo firInfo = findAvailableChannel(this->usrp, "FIR");
 
     // Without either of these, there's no need to continue
     if (not uhd::rfnoc::block_id_t::is_valid_block_id(decimatorInfo.blockID)) {
-        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'decimator'");
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'decimate'");
         throw CF::LifeCycle::InitializeError();
     } else if (decimatorInfo.port == size_t(-1)) {
-        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'decimator' with available port");
+        LOG_FATAL(TuneFilterDecimate_i, "Unable to find RF-NoC block with hint 'decimate' with available port");
         throw CF::LifeCycle::InitializeError();
     }
 
