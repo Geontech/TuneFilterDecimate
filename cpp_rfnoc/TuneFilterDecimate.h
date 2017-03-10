@@ -13,6 +13,9 @@
 #include "GenericThreadedComponent.h"
 #include "RFNoC_Component.h"
 
+// The size of the port hashes
+const CORBA::ULong HASH_SIZE = 1000000;
+
 class TuneFilterDecimate_i : public TuneFilterDecimate_base, public RFNoC_ComponentInterface
 {
     ENABLE_LOGGING
