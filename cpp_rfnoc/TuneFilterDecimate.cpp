@@ -37,23 +37,31 @@ TuneFilterDecimate_i::~TuneFilterDecimate_i()
 
     // Release the threads if necessary
     if (this->rxThread) {
+        LOG_DEBUG(TuneFilterDecimate_i, "Stopping RX thread");
         this->rxThread->stop();
+        LOG_DEBUG(TuneFilterDecimate_i, "Deleting RX thread");
         delete this->rxThread;
     }
 
     if (this->txThread) {
+        LOG_DEBUG(TuneFilterDecimate_i, "Stopping TX thread");
         this->txThread->stop();
+        LOG_DEBUG(TuneFilterDecimate_i, "Deleting RX thread");
         delete this->txThread;
     }
 
     // Reset the RF-NoC blocks
     if (this->decimator.get()) {
+        LOG_DEBUG(TuneFilterDecimate_i, "Clearing decimator");
         this->decimator->clear();
     }
 
     if (this->filter.get()) {
+        LOG_DEBUG(TuneFilterDecimate_i, "Clearing filter");
         this->filter->clear();
     }
+
+    LOG_TRACE(TuneFilterDecimate_i, __PRETTY_FUNCTION__ << " finished");
 }
 
 void TuneFilterDecimate_i::constructor()
