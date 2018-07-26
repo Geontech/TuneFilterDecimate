@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE softpkg PUBLIC "-//JTRS//DTD SCA V2.2.2 SPD//EN" "softpkg.dtd">
-<softpkg id="DCE:c86fc5d6-16d3-11e5-a7fd-3417ebc4aab5" name="rh.TuneFilterDecimate" type="2.0.2" version="2.0.1">
+<softpkg id="DCE:c86fc5d6-16d3-11e5-a7fd-3417ebc4aab5" name="rh.TuneFilterDecimate" type="2.0.9" version="2.0.1">
   <title></title>
   <author>
     <name>REDHAWK</name>
@@ -48,5 +48,10 @@
     <humanlanguage name="EN"/>
     <os name="Linux"/>
     <processor name="RF-NoC-Default"/>
+    <dependency type="other">
+      <softpkgref>
+        <localfile name="/deps/RFNoC_RH/RFNoC_RH.spd.xml"/>
+      </softpkgref>
+    </dependency>
   </implementation>
 </softpkg>
